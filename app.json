@@ -1,25 +1,29 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
+    "name": "Wrench List",
+    "slug": "wrench-list",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "wrenchlist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wrenchlist.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Wrench List needs your location to show nearby tool listings and calculate distances."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FF6B35",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.wrenchlist.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "web": {
       "output": "single",
@@ -32,13 +36,19 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FF6B35",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#1A1A1A"
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Wrench List needs your location to show nearby tool listings."
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
