@@ -1,12 +1,12 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
-import ModalScreen from "@/screens/ModalScreen";
+import FilterModal from "@/screens/FilterModal";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type RootStackParamList = {
   Main: undefined;
-  Modal: undefined;
+  FilterModal: { categoryId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,11 +22,11 @@ export default function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Modal"
-        component={ModalScreen}
+        name="FilterModal"
+        component={FilterModal}
         options={{
           presentation: "modal",
-          headerTitle: "Modal",
+          headerTitle: "Filters",
         }}
       />
     </Stack.Navigator>
