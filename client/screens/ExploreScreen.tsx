@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, ScrollView, StyleSheet, Pressable, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -21,18 +21,16 @@ const workshopImage = require("../../attached_assets/stock_images/professional_w
 const heavyMachineryImage = require("../../attached_assets/stock_images/heavy_machinery_exca_1507963f.jpg");
 const midSizeImage = require("../../attached_assets/stock_images/power_equipment_chai_70088427.jpg");
 const powerToolsImage = require("../../attached_assets/stock_images/power_tools_drill_sa_184c00d0.jpg");
-const handToolsImage = require("../../attached_assets/stock_images/hand_tools_wrench_ha_377bb2db.jpg");
 
 type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, "Explore">;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const categoryImages: Record<string, any> = {
-  workshop: workshopImage,
-  heavy_machinery: heavyMachineryImage,
-  midsize_equipment: midSizeImage,
-  power_tools: powerToolsImage,
-  hand_tools: handToolsImage,
+  "workshop": workshopImage,
+  "heavy-machinery": heavyMachineryImage,
+  "mid-size-equipment": midSizeImage,
+  "power-tools": powerToolsImage,
 };
 
 interface CategoryCardProps {
@@ -90,11 +88,62 @@ function CategoryCard({ id, name, icon, description, onPress }: CategoryCardProp
   );
 }
 
+type ModeType = "browse" | "host";
+
+interface ModeToggleProps {
+  mode: ModeType;
+  onModeChange: (mode: ModeType) => void;
+}
+
+function ModeToggle({ mode, onModeChange }: ModeToggleProps) {
+  const { theme } = useTheme();
+  
+  return (
+    <View style={[styles.toggleContainer, { backgroundColor: theme.backgroundSecondary }]}>
+      <Pressable
+        style={[
+          styles.toggleButton,
+          mode === "browse" && { backgroundColor: Colors.light.primary },
+        ]}
+        onPress={() => onModeChange("browse")}
+      >
+        <ThemedText
+          type="body"
+          style={[
+            styles.toggleText,
+            { color: mode === "browse" ? "#FFFFFF" : theme.text },
+          ]}
+        >
+          Browse
+        </ThemedText>
+      </Pressable>
+      <Pressable
+        style={[
+          styles.toggleButton,
+          mode === "host" && { backgroundColor: Colors.light.primary },
+        ]}
+        onPress={() => onModeChange("host")}
+      >
+        <ThemedText
+          type="body"
+          style={[
+            styles.toggleText,
+            { color: mode === "host" ? "#FFFFFF" : theme.text },
+          ]}
+        >
+          Host
+        </ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const navigation = useNavigation<NavigationProp>();
+  const [mode, setMode] = useState<ModeType>("browse");
 
   const handleCategoryPress = (categoryId: string, categoryName: string) => {
     navigation.navigate("Listings", { categoryId, categoryName });
@@ -114,6 +163,8 @@ export default function ExploreScreen() {
         showsVerticalScrollIndicator={false}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >
+        <ModeToggle mode={mode} onModeChange={setMode} />
+
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <Feather name="tool" size={32} color={Colors.light.primary} />
@@ -122,26 +173,41 @@ export default function ExploreScreen() {
             </ThemedText>
           </View>
           <ThemedText type="body" style={[styles.tagline, { color: theme.textSecondary }]}>
-            Rent the right tool for the job
+            {mode === "browse" ? "Rent the right tool for the job" : "Share your tools and earn"}
           </ThemedText>
         </View>
 
-        <ThemedText type="h3" style={styles.sectionTitle}>
-          Browse Categories
-        </ThemedText>
-
-        <View style={styles.categoriesGrid}>
-          {ListingCategories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              id={category.id}
-              name={category.name}
-              icon={category.icon}
-              description={category.description}
-              onPress={() => handleCategoryPress(category.id, category.name)}
-            />
-          ))}
-        </View>
+        {mode === "browse" ? (
+          <View style={styles.categoriesGrid}>
+            {ListingCategories.map((category) => (
+              <CategoryCard
+                key={category.id}
+                id={category.id}
+                name={category.name}
+                icon={category.icon}
+                description={category.description}
+                onPress={() => handleCategoryPress(category.id, category.name)}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.hostContent}>
+            <View style={[styles.hostCard, { backgroundColor: theme.cardBackground }]}>
+              <Feather name="plus-circle" size={48} color={Colors.light.primary} />
+              <ThemedText type="h4" style={styles.hostCardTitle}>
+                List Your Equipment
+              </ThemedText>
+              <ThemedText type="body" style={[styles.hostCardDescription, { color: theme.textSecondary }]}>
+                Start earning by renting out your tools and equipment to people in your area.
+              </ThemedText>
+              <Pressable style={styles.hostButton}>
+                <ThemedText type="body" style={styles.hostButtonText}>
+                  Get Started
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -156,6 +222,22 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    borderRadius: BorderRadius.sm,
+    padding: 4,
+    marginBottom: Spacing.xl,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toggleText: {
+    fontWeight: "600",
   },
   header: {
     alignItems: "center",
@@ -172,9 +254,6 @@ const styles = StyleSheet.create({
   tagline: {
     marginTop: Spacing.sm,
     textAlign: "center",
-  },
-  sectionTitle: {
-    marginBottom: Spacing.xl,
   },
   categoriesGrid: {
     gap: Spacing.lg,
@@ -213,5 +292,32 @@ const styles = StyleSheet.create({
   },
   categoryDescription: {
     color: "rgba(255, 255, 255, 0.85)",
+  },
+  hostContent: {
+    flex: 1,
+  },
+  hostCard: {
+    padding: Spacing["2xl"],
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+  },
+  hostCardTitle: {
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  hostCardDescription: {
+    textAlign: "center",
+    marginBottom: Spacing.xl,
+  },
+  hostButton: {
+    backgroundColor: Colors.light.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing["2xl"],
+    borderRadius: BorderRadius.xs,
+  },
+  hostButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

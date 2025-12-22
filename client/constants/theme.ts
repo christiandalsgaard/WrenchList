@@ -152,10 +152,4 @@ export const ListingCategories = [
     icon: "zap" as const,
     description: "Drills, saws, sanders",
   },
-  {
-    id: "hand-tools",
-    name: "Hand Tools",
-    icon: "tool" as const,
-    description: "Wrenches, hammers, screwdrivers",
-  },
 ];
