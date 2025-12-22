@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ScrollView, StyleSheet, Pressable, Platform } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -17,9 +17,23 @@ import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, ListingCategories } from "@/constants/theme";
 import { ExploreStackParamList } from "@/navigation/ExploreStackNavigator";
 
+const workshopImage = require("../../attached_assets/stock_images/professional_worksho_eab1201f.jpg");
+const heavyMachineryImage = require("../../attached_assets/stock_images/heavy_machinery_exca_1507963f.jpg");
+const midSizeImage = require("../../attached_assets/stock_images/power_equipment_chai_70088427.jpg");
+const powerToolsImage = require("../../attached_assets/stock_images/power_tools_drill_sa_184c00d0.jpg");
+const handToolsImage = require("../../attached_assets/stock_images/hand_tools_wrench_ha_377bb2db.jpg");
+
 type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, "Explore">;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const categoryImages: Record<string, any> = {
+  workshop: workshopImage,
+  heavy_machinery: heavyMachineryImage,
+  midsize_equipment: midSizeImage,
+  power_tools: powerToolsImage,
+  hand_tools: handToolsImage,
+};
 
 interface CategoryCardProps {
   id: string;
@@ -30,7 +44,6 @@ interface CategoryCardProps {
 }
 
 function CategoryCard({ id, name, icon, description, onPress }: CategoryCardProps) {
-  const { theme } = useTheme();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -45,26 +58,34 @@ function CategoryCard({ id, name, icon, description, onPress }: CategoryCardProp
     scale.value = withSpring(1, { damping: 15, stiffness: 150 });
   };
 
+  const image = categoryImages[id];
+
   return (
     <AnimatedPressable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={[
-        styles.categoryCard,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
-        animatedStyle,
-      ]}
+      style={[styles.categoryCard, animatedStyle]}
     >
-      <View style={[styles.iconContainer, { backgroundColor: Colors.light.primary + "15" }]}>
-        <Feather name={icon} size={28} color={Colors.light.primary} />
-      </View>
-      <ThemedText type="h4" style={styles.categoryName}>
-        {name}
-      </ThemedText>
-      <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        {description}
-      </ThemedText>
+      <ImageBackground
+        source={image}
+        style={styles.imageBackground}
+        imageStyle={styles.image}
+        resizeMode="cover"
+      >
+        <View style={styles.overlay} />
+        <View style={styles.cardContent}>
+          <View style={styles.iconContainer}>
+            <Feather name={icon} size={24} color="#FFFFFF" />
+          </View>
+          <ThemedText type="h4" style={styles.categoryName}>
+            {name}
+          </ThemedText>
+          <ThemedText type="small" style={styles.categoryDescription}>
+            {description}
+          </ThemedText>
+        </View>
+      </ImageBackground>
     </AnimatedPressable>
   );
 }
@@ -100,7 +121,7 @@ export default function ExploreScreen() {
               Wrench List
             </ThemedText>
           </View>
-          <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+          <ThemedText type="body" style={[styles.tagline, { color: theme.textSecondary }]}>
             Rent the right tool for the job
           </ThemedText>
         </View>
@@ -137,6 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   header: {
+    alignItems: "center",
     marginBottom: Spacing["3xl"],
   },
   logoContainer: {
@@ -147,6 +169,10 @@ const styles = StyleSheet.create({
   appName: {
     color: Colors.light.primary,
   },
+  tagline: {
+    marginTop: Spacing.sm,
+    textAlign: "center",
+  },
   sectionTitle: {
     marginBottom: Spacing.xl,
   },
@@ -154,19 +180,38 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   categoryCard: {
-    padding: Spacing.xl,
     borderRadius: BorderRadius.sm,
-    borderWidth: 1,
+    overflow: "hidden",
+    height: 160,
+  },
+  imageBackground: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  image: {
+    borderRadius: BorderRadius.sm,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  cardContent: {
+    padding: Spacing.lg,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     borderRadius: BorderRadius.xs,
+    backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   categoryName: {
+    color: "#FFFFFF",
     marginBottom: Spacing.xs,
+  },
+  categoryDescription: {
+    color: "rgba(255, 255, 255, 0.85)",
   },
 });
