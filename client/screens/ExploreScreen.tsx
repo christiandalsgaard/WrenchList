@@ -149,6 +149,10 @@ export default function ExploreScreen() {
     navigation.navigate("Listings", { categoryId, categoryName });
   };
 
+  const handleMenuPress = () => {
+    // Menu functionality placeholder
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView
@@ -156,26 +160,35 @@ export default function ExploreScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + Spacing.xl,
+            paddingTop: insets.top + Spacing.lg,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
         ]}
         showsVerticalScrollIndicator={false}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >
-        <ModeToggle mode={mode} onModeChange={setMode} />
-
-        <View style={styles.header}>
+        <View style={styles.topBar}>
+          <View style={styles.placeholder} />
           <View style={styles.logoContainer}>
-            <Feather name="tool" size={32} color={Colors.light.primary} />
-            <ThemedText type="h2" style={styles.appName}>
+            <Feather name="tool" size={28} color={Colors.light.primary} />
+            <ThemedText type="h3" style={styles.appName}>
               Wrench List
             </ThemedText>
           </View>
+          <Pressable style={styles.menuButton} onPress={handleMenuPress}>
+            <Feather name="menu" size={24} color={theme.text} />
+          </Pressable>
+        </View>
+
+        <View style={styles.header}>
           <ThemedText type="body" style={[styles.tagline, { color: theme.textSecondary }]}>
             {mode === "browse" ? "Rent the right tool for the job" : "Share your tools and earn"}
           </ThemedText>
         </View>
+
+        <View style={styles.divider} />
+
+        <ModeToggle mode={mode} onModeChange={setMode} />
 
         {mode === "browse" ? (
           <View style={styles.categoriesGrid}>
@@ -223,6 +236,41 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.lg,
   },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  placeholder: {
+    width: 40,
+  },
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  appName: {
+    color: Colors.light.primary,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  tagline: {
+    textAlign: "center",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#1A1A1A",
+    marginBottom: Spacing.lg,
+  },
   toggleContainer: {
     flexDirection: "row",
     borderRadius: BorderRadius.sm,
@@ -238,22 +286,6 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontWeight: "600",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: Spacing["3xl"],
-  },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  appName: {
-    color: Colors.light.primary,
-  },
-  tagline: {
-    marginTop: Spacing.sm,
-    textAlign: "center",
   },
   categoriesGrid: {
     gap: Spacing.lg,

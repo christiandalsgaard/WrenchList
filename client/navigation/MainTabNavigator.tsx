@@ -1,7 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { Platform, StyleSheet, View, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -44,24 +43,13 @@ export default function MainTabNavigator() {
       initialRouteName="ExploreTab"
       screenOptions={{
         tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: theme.tabIconDefault,
+        tabBarInactiveTintColor: "#9BA1A6",
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: Platform.select({
-            ios: "transparent",
-            android: theme.backgroundRoot,
-          }),
+          backgroundColor: "#1A1A1A",
           borderTopWidth: 0,
           elevation: 0,
         },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null,
         headerShown: false,
       }}
     >
