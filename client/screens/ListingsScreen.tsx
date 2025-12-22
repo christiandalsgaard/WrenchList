@@ -12,7 +12,6 @@ import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { HeaderButton } from "@react-navigation/elements";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
 import Animated, {
   useAnimatedStyle,
@@ -23,6 +22,7 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { NativeMap } from "@/components/NativeMap";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { ExploreStackParamList } from "@/navigation/ExploreStackNavigator";
@@ -121,7 +121,7 @@ function FilterChip({ label, onRemove }: FilterChipProps) {
 
 export default function ListingsScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<NavigationProp>();
   const rootNavigation = useNavigation<RootNavigationProp>();
@@ -138,6 +138,7 @@ export default function ListingsScreen() {
 
   useEffect(() => {
     (async () => {
+      if (Platform.OS === "web") return;
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === "granted") {
         const location = await Location.getCurrentPositionAsync({});
@@ -150,15 +151,17 @@ export default function ListingsScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerRight}>
-          <HeaderButton
-            onPress={() => setViewMode(viewMode === "list" ? "map" : "list")}
-          >
-            <Feather
-              name={viewMode === "list" ? "map" : "list"}
-              size={22}
-              color={theme.text}
-            />
-          </HeaderButton>
+          {Platform.OS !== "web" ? (
+            <HeaderButton
+              onPress={() => setViewMode(viewMode === "list" ? "map" : "list")}
+            >
+              <Feather
+                name={viewMode === "list" ? "map" : "list"}
+                size={22}
+                color={theme.text}
+              />
+            </HeaderButton>
+          ) : null}
           <HeaderButton
             onPress={() => rootNavigation.navigate("FilterModal", { categoryId })}
           >
@@ -197,6 +200,22 @@ export default function ListingsScreen() {
         longitudeDelta: 0.5,
       };
 
+  const markers = listings.map((listing) => ({
+    id: listing.id,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
+    onPress: () => setSelectedListing(listing),
+    children: (
+      <View style={styles.markerContainer}>
+        <View style={styles.marker}>
+          <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+            ${listing.pricePerDay}
+          </ThemedText>
+        </View>
+      </View>
+    ),
+  }));
+
   return (
     <ThemedView style={styles.container}>
       {activeFilters.length > 0 ? (
@@ -216,7 +235,7 @@ export default function ListingsScreen() {
         </View>
       ) : null}
 
-      {viewMode === "list" ? (
+      {viewMode === "list" || Platform.OS === "web" ? (
         <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
@@ -242,32 +261,13 @@ export default function ListingsScreen() {
         />
       ) : (
         <View style={styles.mapContainer}>
-          <MapView
+          <NativeMap
             style={styles.map}
             initialRegion={initialRegion}
             showsUserLocation
             showsMyLocationButton
-            provider={PROVIDER_DEFAULT}
-          >
-            {listings.map((listing) => (
-              <Marker
-                key={listing.id}
-                coordinate={{
-                  latitude: listing.latitude,
-                  longitude: listing.longitude,
-                }}
-                onPress={() => setSelectedListing(listing)}
-              >
-                <View style={styles.markerContainer}>
-                  <View style={styles.marker}>
-                    <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                      ${listing.pricePerDay}
-                    </ThemedText>
-                  </View>
-                </View>
-              </Marker>
-            ))}
-          </MapView>
+            markers={markers}
+          />
           
           {selectedListing ? (
             <Animated.View

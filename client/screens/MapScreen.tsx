@@ -1,22 +1,85 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Pressable, Platform, FlatList } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import * as Location from "expo-location";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { NativeMap } from "@/components/NativeMap";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, ListingCategories } from "@/constants/theme";
 import { getAllMockListings, Listing } from "@/lib/mockData";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type RootNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function ListingListItem({ listing, onPress }: { listing: Listing; onPress: () => void }) {
+  const { theme } = useTheme();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const getCategoryIcon = (categoryId: string): keyof typeof Feather.glyphMap => {
+    const category = ListingCategories.find((c) => c.id === categoryId);
+    return category?.icon || "tool";
+  };
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.98, { damping: 15, stiffness: 150 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 15, stiffness: 150 });
+      }}
+      style={[
+        styles.listItem,
+        { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        animatedStyle,
+      ]}
+    >
+      <View style={[styles.listItemImage, { backgroundColor: theme.backgroundSecondary }]}>
+        <Feather name={getCategoryIcon(listing.categoryId)} size={24} color={theme.textSecondary} />
+      </View>
+      <View style={styles.listItemInfo}>
+        <ThemedText type="body" style={{ fontWeight: "600" }} numberOfLines={1}>
+          {listing.title}
+        </ThemedText>
+        <ThemedText type="price" style={{ color: Colors.light.primary }}>
+          ${listing.pricePerDay}/day
+        </ThemedText>
+        <View style={styles.listItemMeta}>
+          <Feather name="map-pin" size={12} color={theme.textSecondary} />
+          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+            {listing.city}, {listing.state}
+          </ThemedText>
+          <View style={styles.rating}>
+            <Feather name="star" size={12} color={Colors.light.accent} />
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+              {listing.rating.toFixed(1)}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+    </AnimatedPressable>
+  );
+}
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -32,6 +95,10 @@ export default function MapScreen() {
 
   useEffect(() => {
     (async () => {
+      if (Platform.OS === "web") {
+        setLocationPermission(false);
+        return;
+      }
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status === "granted");
       if (status === "granted") {
@@ -60,6 +127,31 @@ export default function MapScreen() {
         longitudeDelta: 0.3,
       };
 
+  if (Platform.OS === "web") {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={[styles.webHeader, { paddingTop: insets.top + Spacing.lg }]}>
+          <ThemedText type="h2">All Listings</ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+            Map view available in Expo Go
+          </ThemedText>
+        </View>
+        <FlatList
+          data={listings}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ListingListItem listing={item} onPress={() => navigation.navigate("GlobalListingDetail", { listingId: item.id })} />
+          )}
+          contentContainerStyle={[
+            styles.webListContent,
+            { paddingBottom: tabBarHeight + Spacing.xl },
+          ]}
+          showsVerticalScrollIndicator={false}
+        />
+      </ThemedView>
+    );
+  }
+
   if (locationPermission === false) {
     return (
       <ThemedView style={[styles.container, styles.centered]}>
@@ -73,60 +165,51 @@ export default function MapScreen() {
         >
           Enable location access to see listings near you on the map
         </ThemedText>
-        {Platform.OS !== "web" ? (
-          <Pressable
-            onPress={async () => {
-              try {
-                const { openSettings } = await import("expo-linking");
-                await openSettings();
-              } catch (e) {}
-            }}
-            style={[styles.settingsButton, { backgroundColor: Colors.light.primary }]}
-          >
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-              Open Settings
-            </ThemedText>
-          </Pressable>
-        ) : (
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.lg }}>
-            Run in Expo Go to use this feature
+        <Pressable
+          onPress={async () => {
+            try {
+              const { openSettings } = await import("expo-linking");
+              await openSettings();
+            } catch (e) {}
+          }}
+          style={[styles.settingsButton, { backgroundColor: Colors.light.primary }]}
+        >
+          <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+            Open Settings
           </ThemedText>
-        )}
+        </Pressable>
       </ThemedView>
     );
   }
 
+  const markers = listings.map((listing) => ({
+    id: listing.id,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
+    onPress: () => setSelectedListing(listing),
+    children: (
+      <View style={styles.markerContainer}>
+        <View style={styles.marker}>
+          <Feather
+            name={getCategoryIcon(listing.categoryId)}
+            size={16}
+            color="#FFFFFF"
+          />
+        </View>
+        <View style={styles.markerPointer} />
+      </View>
+    ),
+  }));
+
   return (
     <ThemedView style={styles.container}>
-      <MapView
+      <NativeMap
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation
         showsMyLocationButton
-        provider={PROVIDER_DEFAULT}
-      >
-        {listings.map((listing) => (
-          <Marker
-            key={listing.id}
-            coordinate={{
-              latitude: listing.latitude,
-              longitude: listing.longitude,
-            }}
-            onPress={() => setSelectedListing(listing)}
-          >
-            <View style={styles.markerContainer}>
-              <View style={styles.marker}>
-                <Feather
-                  name={getCategoryIcon(listing.categoryId)}
-                  size={16}
-                  color="#FFFFFF"
-                />
-              </View>
-              <View style={styles.markerPointer} />
-            </View>
-          </Marker>
-        ))}
-      </MapView>
+        markers={markers}
+      />
 
       <View style={[styles.header, { top: insets.top + Spacing.md }]}>
         <View style={[styles.searchBar, { backgroundColor: theme.cardBackground }]}>
@@ -150,7 +233,7 @@ export default function MapScreen() {
         >
           <Pressable
             onPress={() => {
-              navigation.navigate("Main");
+              navigation.navigate("GlobalListingDetail", { listingId: selectedListing.id });
             }}
             style={styles.cardContent}
           >
@@ -198,6 +281,38 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  webHeader: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+  webListContent: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+  },
+  listItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    gap: Spacing.md,
+  },
+  listItemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listItemInfo: {
+    flex: 1,
+  },
+  listItemMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   header: {
     position: "absolute",

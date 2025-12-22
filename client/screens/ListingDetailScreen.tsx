@@ -1,9 +1,8 @@
 import React from "react";
-import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,6 +11,7 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { NativeMap } from "@/components/NativeMap";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
@@ -58,6 +58,17 @@ export default function ListingDetailScreen() {
       </ThemedView>
     );
   }
+
+  const markers = [{
+    id: listing.id,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
+    children: (
+      <View style={styles.locationMarker}>
+        <Feather name="map-pin" size={24} color={Colors.light.primary} />
+      </View>
+    ),
+  }];
 
   return (
     <ThemedView style={styles.container}>
@@ -146,7 +157,7 @@ export default function ListingDetailScreen() {
             {listing.city}, {listing.region}, {listing.state}
           </ThemedText>
           <View style={[styles.mapContainer, { borderColor: theme.border }]}>
-            <MapView
+            <NativeMap
               style={styles.map}
               initialRegion={{
                 latitude: listing.latitude,
@@ -156,19 +167,8 @@ export default function ListingDetailScreen() {
               }}
               scrollEnabled={false}
               zoomEnabled={false}
-              provider={PROVIDER_DEFAULT}
-            >
-              <Marker
-                coordinate={{
-                  latitude: listing.latitude,
-                  longitude: listing.longitude,
-                }}
-              >
-                <View style={styles.marker}>
-                  <Feather name="map-pin" size={24} color={Colors.light.primary} />
-                </View>
-              </Marker>
-            </MapView>
+              markers={markers}
+            />
           </View>
         </View>
 
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  marker: {
+  locationMarker: {
     alignItems: "center",
     justifyContent: "center",
   },
