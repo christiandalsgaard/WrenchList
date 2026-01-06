@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL with Drizzle ORM
 - **Schema Location**: `shared/schema.ts` - shared between client and server
 - **Migrations**: Managed via drizzle-kit (`db:push` command)
-- **Current Schema**: Basic users table with id, username, password fields
+- **Current Schema**: Users table with id, displayName, email, phone, password, address, city, state, zipCode, role, createdAt
 - **Development Storage**: Mock data system in `client/lib/mockData.ts` for listings
 
 ### Security Notes
@@ -67,9 +67,9 @@ shared/          # Code shared between client/server
 3. Power Tools
 
 ### Authentication
-- **Sign Up**: Collects name, email, phone, password with bcrypt hashing
+- **Sign Up**: Collects name, email, phone, address (street, city, state, ZIP), password with bcrypt hashing
 - **Sign In**: Email/password authentication with password visibility toggle
-- **AuthProvider Context**: Manages user state with AsyncStorage persistence
+- **AuthProvider Context**: Manages user state with AsyncStorage persistence, includes full address data
 - **Menu Modal**: Hamburger menu with Sign In/Create Account options
 
 ### Host Flow
@@ -81,9 +81,9 @@ shared/          # Code shared between client/server
 - **ExploreScreen**: Main category selection with Wrench List branding
 - **ListingsScreen**: Grid/map toggle, filter chips, listing cards
 - **ListingDetailScreen**: Full listing info, pricing (hourly/daily/weekly), features, location map, safety requirements
-- **MapScreen**: Full-screen map with markers (native) or list fallback (web)
-- **MessagesScreen**: Placeholder for future messaging
-- **ProfileScreen**: Guest user profile with menu sections
+- **MapScreen**: Full-screen map with markers (native) or list fallback (web); listings ordered by proximity to user with distance badges
+- **MessagesScreen**: Conditional rendering - sign-in prompt for guests, user context with mock messages for authenticated users
+- **ProfileScreen**: User info display (initials avatar, name, email, location, role badge) when signed in; sign-in prompt for guests
 - **FilterModal**: Filter by City, Region, State, Proximity
 
 ### Platform-Specific Features
