@@ -4,7 +4,7 @@
 
 Wrench List is a two-sided marketplace mobile application for tool and equipment rentals. Built with React Native and Expo, it connects customers looking to rent tools with hosts who list their equipment. The app features location-based discovery, category browsing, messaging, and user profiles with distinct experiences for renters and equipment owners.
 
-**Current State**: MVP with 5 discrete listing categories, filterable listings, map and list views, and mock data for 10 realistic listings.
+**Current State**: MVP with 3 listing categories (Workshop, Equipment, Tools), user authentication (signup/signin), host listing creation flow, and database-backed user and listing storage.
 
 ## User Preferences
 
@@ -38,6 +38,11 @@ Preferred communication style: Simple, everyday language.
 - **Current Schema**: Basic users table with id, username, password fields
 - **Development Storage**: Mock data system in `client/lib/mockData.ts` for listings
 
+### Security Notes
+- **MVP limitation**: Current implementation uses client-supplied hostId; proper session-based auth (JWT/cookies) recommended for production
+- **Password hashing**: Uses bcrypt with 10 salt rounds
+- **Data validation**: Zod schemas for all form inputs
+
 ### Project Structure
 ```
 client/          # React Native/Expo application
@@ -56,12 +61,21 @@ shared/          # Code shared between client/server
 
 ## Implemented Features
 
-### Listing Categories (5 discrete)
+### Listing Categories (3 discrete)
 1. Workshop/Garage Space
-2. Heavy Machinery
-3. Mid-Size Power Equipment
-4. Power Tools
-5. Hand Tools
+2. Mid-Size Power Equipment
+3. Power Tools
+
+### Authentication
+- **Sign Up**: Collects name, email, phone, password with bcrypt hashing
+- **Sign In**: Email/password authentication with password visibility toggle
+- **AuthProvider Context**: Manages user state with AsyncStorage persistence
+- **Menu Modal**: Hamburger menu with Sign In/Create Account options
+
+### Host Flow
+- **Category Selection**: Workshop, Equipment, or Tools
+- **Listing Form**: Title, description, location, city, photos (up to 5), pricing with unit selection (hour/day/week)
+- **User Role**: Automatically updated to "host" when first listing is created
 
 ### Screens
 - **ExploreScreen**: Main category selection with Wrench List branding
