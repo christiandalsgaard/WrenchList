@@ -159,7 +159,7 @@ export default function ExploreScreen() {
           styles.content,
           {
             paddingTop: insets.top + Spacing.lg,
-            paddingBottom: tabBarHeight + Spacing.xl,
+            paddingBottom: tabBarHeight + Spacing["3xl"],
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   categoryCard: {
     borderRadius: BorderRadius.sm,
     overflow: "hidden",
-    height: 160,
+    height: 192,
   },
   imageBackground: {
     flex: 1,
