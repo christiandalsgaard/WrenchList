@@ -49,7 +49,7 @@ export default function MainTabNavigator() {
           backgroundColor: "#1A1A1A",
           borderTopWidth: 0,
           elevation: 0,
-          paddingBottom: 5,
+          paddingTop: 5,
         },
         headerShown: false,
       }}
