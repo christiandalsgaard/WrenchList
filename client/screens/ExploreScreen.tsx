@@ -16,12 +16,16 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, ListingCategories } from "@/constants/theme";
 import { ExploreStackParamList } from "@/navigation/ExploreStackNavigator";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import MenuModal from "@/screens/MenuModal";
+import { useAuth } from "@/lib/authContext";
 
 const workshopImage = require("../../attached_assets/stock_images/professional_worksho_eab1201f.jpg");
 const midSizeImage = require("../../attached_assets/stock_images/power_equipment_chai_70088427.jpg");
 const powerToolsImage = require("../../attached_assets/stock_images/power_tools_drill_sa_184c00d0.jpg");
 
-type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, "Explore">;
+type ExploreNavProp = NativeStackNavigationProp<ExploreStackParamList, "Explore">;
+type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -140,19 +144,44 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
-  const navigation = useNavigation<NavigationProp>();
+  const exploreNavigation = useNavigation<ExploreNavProp>();
+  const rootNavigation = useNavigation<RootNavProp>();
+  const { user } = useAuth();
   const [mode, setMode] = useState<ModeType>("browse");
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleCategoryPress = (categoryId: string, categoryName: string) => {
-    navigation.navigate("Listings", { categoryId, categoryName });
+    exploreNavigation.navigate("Listings", { categoryId, categoryName });
   };
 
   const handleMenuPress = () => {
-    // Menu functionality placeholder
+    setMenuVisible(true);
+  };
+
+  const handleSignIn = () => {
+    rootNavigation.navigate("SignIn");
+  };
+
+  const handleCreateAccount = () => {
+    rootNavigation.navigate("CreateAccount");
+  };
+
+  const handleGetStarted = () => {
+    if (!user) {
+      rootNavigation.navigate("CreateAccount");
+    } else {
+      rootNavigation.navigate("CreateListing");
+    }
   };
 
   return (
     <ThemedView style={styles.container}>
+      <MenuModal
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onSignIn={handleSignIn}
+        onCreateAccount={handleCreateAccount}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -211,7 +240,7 @@ export default function ExploreScreen() {
               <ThemedText type="body" style={[styles.hostCardDescription, { color: theme.textSecondary }]}>
                 Start earning by renting out your tools and equipment to people in your area.
               </ThemedText>
-              <Pressable style={styles.hostButton}>
+              <Pressable style={styles.hostButton} onPress={handleGetStarted}>
                 <ThemedText type="body" style={styles.hostButtonText}>
                   Get Started
                 </ThemedText>
