@@ -51,7 +51,7 @@ export default function MainTabNavigator() {
           elevation: 0,
         },
         tabBarItemStyle: {
-          marginTop: -10,
+          marginTop: -15,
         },
         headerShown: false,
       }}
