@@ -130,25 +130,19 @@ export const Fonts = Platform.select({
 export const ListingCategories = [
   {
     id: "workshop",
-    name: "Workshop/Garage",
+    name: "Workshop",
     icon: "home" as const,
     description: "Specialized tools & workspace",
   },
   {
-    id: "heavy-machinery",
-    name: "Heavy Machinery",
-    icon: "truck" as const,
-    description: "Excavators, loaders & more",
-  },
-  {
     id: "mid-size-equipment",
-    name: "Mid-Size Equipment",
+    name: "Equipment",
     icon: "settings" as const,
     description: "Lawnmowers, pressure washers",
   },
   {
     id: "power-tools",
-    name: "Power Tools",
+    name: "Tools",
     icon: "zap" as const,
     description: "Drills, saws, sanders",
   },

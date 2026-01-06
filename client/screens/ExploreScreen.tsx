@@ -18,7 +18,6 @@ import { Colors, Spacing, BorderRadius, ListingCategories } from "@/constants/th
 import { ExploreStackParamList } from "@/navigation/ExploreStackNavigator";
 
 const workshopImage = require("../../attached_assets/stock_images/professional_worksho_eab1201f.jpg");
-const heavyMachineryImage = require("../../attached_assets/stock_images/heavy_machinery_exca_1507963f.jpg");
 const midSizeImage = require("../../attached_assets/stock_images/power_equipment_chai_70088427.jpg");
 const powerToolsImage = require("../../attached_assets/stock_images/power_tools_drill_sa_184c00d0.jpg");
 
@@ -28,7 +27,6 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const categoryImages: Record<string, any> = {
   "workshop": workshopImage,
-  "heavy-machinery": heavyMachineryImage,
   "mid-size-equipment": midSizeImage,
   "power-tools": powerToolsImage,
 };
