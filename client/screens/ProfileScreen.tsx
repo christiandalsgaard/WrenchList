@@ -2,6 +2,8 @@ import React from "react";
 import { View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
@@ -13,6 +15,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { useAuth } from "@/lib/authContext";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -76,6 +82,29 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
+  const { user, signOut } = useAuth();
+  const navigation = useNavigation<RootNavProp>();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const handleSignIn = () => {
+    navigation.navigate("SignIn");
+  };
+
+  const handleCreateAccount = () => {
+    navigation.navigate("CreateAccount");
+  };
+
+  const displayName = user?.displayName || "Guest User";
+  const userRole = user?.role || "customer";
+  const userLocation = user?.city && user?.state 
+    ? `${user.city}, ${user.state}` 
+    : user?.city || "Location not set";
+  const userInitials = user?.displayName
+    ? user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : null;
 
   return (
     <ThemedView style={styles.container}>
@@ -91,21 +120,59 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileSection}>
-          <View style={[styles.avatar, { backgroundColor: theme.backgroundSecondary }]}>
-            <Feather name="user" size={40} color={theme.textSecondary} />
+          <View style={[styles.avatar, { backgroundColor: user ? Colors.light.primary : theme.backgroundSecondary }]}>
+            {userInitials ? (
+              <ThemedText type="h3" style={{ color: "#FFFFFF" }}>
+                {userInitials}
+              </ThemedText>
+            ) : (
+              <Feather name="user" size={40} color={theme.textSecondary} />
+            )}
           </View>
           <ThemedText type="h3" style={styles.userName}>
-            Guest User
+            {displayName}
           </ThemedText>
           <View style={[styles.userTypeBadge, { backgroundColor: Colors.light.secondary + "20" }]}>
             <ThemedText type="caption" style={{ color: Colors.light.secondary, fontWeight: "600" }}>
-              Customer
+              {userRole === "host" ? "Host" : "Customer"}
             </ThemedText>
           </View>
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
-            San Francisco, CA
-          </ThemedText>
+          {user ? (
+            <>
+              <ThemedText type="small" style={[styles.userInfo, { color: theme.textSecondary }]}>
+                {user.email}
+              </ThemedText>
+              <View style={styles.locationRow}>
+                <Feather name="map-pin" size={14} color={theme.textSecondary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                  {userLocation}
+                </ThemedText>
+              </View>
+            </>
+          ) : (
+            <ThemedText type="small" style={[styles.userInfo, { color: theme.textSecondary }]}>
+              Sign in to access your profile
+            </ThemedText>
+          )}
         </View>
+
+        {!user ? (
+          <View style={styles.authButtons}>
+            <Pressable style={styles.primaryButton} onPress={handleSignIn}>
+              <ThemedText type="body" style={styles.primaryButtonText}>
+                Sign In
+              </ThemedText>
+            </Pressable>
+            <Pressable 
+              style={[styles.secondaryButton, { borderColor: Colors.light.primary }]} 
+              onPress={handleCreateAccount}
+            >
+              <ThemedText type="body" style={{ color: Colors.light.primary, fontWeight: "600" }}>
+                Create Account
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={[styles.section, { borderColor: theme.border }]}>
           <ThemedText type="caption" style={[styles.sectionTitle, { color: theme.textSecondary }]}>
@@ -134,9 +201,11 @@ export default function ProfileScreen() {
           <MenuItem icon="shield" label="Privacy Policy" onPress={() => {}} />
         </View>
 
-        <View style={styles.section}>
-          <MenuItem icon="log-out" label="Sign Out" onPress={() => {}} danger />
-        </View>
+        {user ? (
+          <View style={styles.section}>
+            <MenuItem icon="log-out" label="Sign Out" onPress={handleSignOut} danger />
+          </View>
+        ) : null}
 
         <ThemedText type="caption" style={[styles.version, { color: theme.textSecondary }]}>
           Wrench List v1.0.0
@@ -154,11 +223,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   profileSection: {
     alignItems: "center",
-    marginBottom: Spacing["3xl"],
+    marginBottom: Spacing["2xl"],
   },
   avatar: {
     width: 100,
@@ -175,6 +244,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
+  },
+  userInfo: {
+    marginTop: Spacing.md,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  authButtons: {
+    gap: Spacing.md,
+    marginBottom: Spacing["2xl"],
+  },
+  primaryButton: {
+    height: Spacing.buttonHeight,
+    backgroundColor: Colors.light.primary,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    height: Spacing.buttonHeight,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
   },
   section: {
     marginBottom: Spacing.xl,

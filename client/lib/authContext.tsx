@@ -7,6 +7,10 @@ interface User {
   email: string;
   displayName: string;
   phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
   role: "customer" | "host";
   createdAt: string;
 }
@@ -24,6 +28,10 @@ interface SignUpData {
   password: string;
   displayName: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   role?: "customer" | "host";
 }
 

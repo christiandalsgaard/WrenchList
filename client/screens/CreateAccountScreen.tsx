@@ -19,6 +19,10 @@ export default function CreateAccountScreen() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +50,10 @@ export default function CreateAccountScreen() {
       displayName: displayName.trim(),
       email: email.trim(),
       phone: phone.trim() || undefined,
+      address: address.trim() || undefined,
+      city: city.trim() || undefined,
+      state: state.trim() || undefined,
+      zipCode: zipCode.trim() || undefined,
       password,
       role: "customer",
     });
@@ -62,7 +70,7 @@ export default function CreateAccountScreen() {
       <KeyboardAwareScrollViewCompat
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Spacing.xl, paddingBottom: insets.bottom + Spacing.xl },
+          { paddingTop: Spacing.xl, paddingBottom: insets.bottom + Spacing["2xl"] },
         ]}
       >
         <View style={styles.header}>
@@ -80,7 +88,7 @@ export default function CreateAccountScreen() {
         {error ? (
           <View style={[styles.errorContainer, { backgroundColor: "rgba(244, 67, 54, 0.1)" }]}>
             <Feather name="alert-circle" size={16} color={Colors.light.error} />
-            <ThemedText type="small" style={{ color: Colors.light.error }}>
+            <ThemedText type="small" style={[styles.errorText, { color: Colors.light.error }]}>
               {error}
             </ThemedText>
           </View>
@@ -126,7 +134,7 @@ export default function CreateAccountScreen() {
 
           <View style={styles.inputGroup}>
             <ThemedText type="small" style={styles.label}>
-              Phone (Optional)
+              Phone
             </ThemedText>
             <TextInput
               style={[
@@ -140,6 +148,79 @@ export default function CreateAccountScreen() {
               keyboardType="phone-pad"
               autoComplete="tel"
             />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText type="small" style={styles.label}>
+              Street Address
+            </ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                { backgroundColor: theme.backgroundSecondary, color: theme.text },
+              ]}
+              placeholder="Enter your street address"
+              placeholderTextColor={theme.textSecondary}
+              value={address}
+              onChangeText={setAddress}
+              autoCapitalize="words"
+              autoComplete="street-address"
+            />
+          </View>
+
+          <View style={styles.rowInputs}>
+            <View style={[styles.inputGroup, styles.cityInput]}>
+              <ThemedText type="small" style={styles.label}>
+                City
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.backgroundSecondary, color: theme.text },
+                ]}
+                placeholder="City"
+                placeholderTextColor={theme.textSecondary}
+                value={city}
+                onChangeText={setCity}
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={[styles.inputGroup, styles.stateInput]}>
+              <ThemedText type="small" style={styles.label}>
+                State
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.backgroundSecondary, color: theme.text },
+                ]}
+                placeholder="ST"
+                placeholderTextColor={theme.textSecondary}
+                value={state}
+                onChangeText={setState}
+                autoCapitalize="characters"
+                maxLength={2}
+              />
+            </View>
+
+            <View style={[styles.inputGroup, styles.zipInput]}>
+              <ThemedText type="small" style={styles.label}>
+                ZIP
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: theme.backgroundSecondary, color: theme.text },
+                ]}
+                placeholder="00000"
+                placeholderTextColor={theme.textSecondary}
+                value={zipCode}
+                onChangeText={setZipCode}
+                keyboardType="number-pad"
+                maxLength={5}
+              />
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -215,7 +296,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   header: {
     alignItems: "center",
@@ -244,6 +325,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     gap: Spacing.sm,
   },
+  errorText: {
+    flex: 1,
+  },
   form: {
     gap: Spacing.lg,
   },
@@ -252,12 +336,26 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "500",
+    marginLeft: Spacing.xs,
   },
   input: {
     height: Spacing.inputHeight,
     borderRadius: BorderRadius.xs,
     paddingHorizontal: Spacing.md,
     fontSize: 16,
+  },
+  rowInputs: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  cityInput: {
+    flex: 2,
+  },
+  stateInput: {
+    flex: 1,
+  },
+  zipInput: {
+    flex: 1.2,
   },
   passwordContainer: {
     position: "relative",

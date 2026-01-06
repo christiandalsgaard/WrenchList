@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   header: {
     alignItems: "center",
@@ -179,6 +179,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "500",
+    marginLeft: Spacing.xs,
   },
   input: {
     height: Spacing.inputHeight,

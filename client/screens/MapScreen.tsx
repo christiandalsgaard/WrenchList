@@ -25,7 +25,23 @@ type RootNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function ListingListItem({ listing, onPress }: { listing: Listing; onPress: () => void }) {
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3959;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+interface ListingWithDistance extends Listing {
+  distance?: number;
+}
+
+function ListingListItem({ listing, onPress }: { listing: ListingWithDistance; onPress: () => void }) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -36,6 +52,12 @@ function ListingListItem({ listing, onPress }: { listing: Listing; onPress: () =
   const getCategoryIcon = (categoryId: string): keyof typeof Feather.glyphMap => {
     const category = ListingCategories.find((c) => c.id === categoryId);
     return category?.icon || "tool";
+  };
+
+  const formatDistance = (distance?: number) => {
+    if (distance === undefined) return null;
+    if (distance < 1) return `${Math.round(distance * 5280)} ft`;
+    return `${distance.toFixed(1)} mi`;
   };
 
   return (
@@ -65,15 +87,16 @@ function ListingListItem({ listing, onPress }: { listing: Listing; onPress: () =
         </ThemedText>
         <View style={styles.listItemMeta}>
           <Feather name="map-pin" size={12} color={theme.textSecondary} />
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+          <ThemedText type="caption" style={{ color: theme.textSecondary }} numberOfLines={1}>
             {listing.city}, {listing.state}
           </ThemedText>
-          <View style={styles.rating}>
-            <Feather name="star" size={12} color={Colors.light.accent} />
-            <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-              {listing.rating.toFixed(1)}
-            </ThemedText>
-          </View>
+          {listing.distance !== undefined ? (
+            <View style={styles.distanceBadge}>
+              <ThemedText type="caption" style={{ color: Colors.light.primary, fontWeight: "600" }}>
+                {formatDistance(listing.distance)}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
       </View>
       <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -88,10 +111,10 @@ export default function MapScreen() {
   const navigation = useNavigation<RootNavigationProp>();
   
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
-  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [selectedListing, setSelectedListing] = useState<ListingWithDistance | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
 
-  const listings = useMemo(() => getAllMockListings(), []);
+  const allListings = useMemo(() => getAllMockListings(), []);
 
   useEffect(() => {
     (async () => {
@@ -108,9 +131,33 @@ export default function MapScreen() {
     })();
   }, []);
 
+  const sortedListings: ListingWithDistance[] = useMemo(() => {
+    if (!userLocation) {
+      return allListings.map(l => ({ ...l, distance: undefined }));
+    }
+    
+    const withDistance = allListings.map((listing) => ({
+      ...listing,
+      distance: calculateDistance(
+        userLocation.coords.latitude,
+        userLocation.coords.longitude,
+        listing.latitude,
+        listing.longitude
+      ),
+    }));
+    
+    return withDistance.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+  }, [allListings, userLocation]);
+
   const getCategoryIcon = (categoryId: string): keyof typeof Feather.glyphMap => {
     const category = ListingCategories.find((c) => c.id === categoryId);
     return category?.icon || "tool";
+  };
+
+  const formatDistance = (distance?: number) => {
+    if (distance === undefined) return null;
+    if (distance < 1) return `${Math.round(distance * 5280)} ft`;
+    return `${distance.toFixed(1)} mi`;
   };
 
   const initialRegion = userLocation
@@ -131,13 +178,13 @@ export default function MapScreen() {
     return (
       <ThemedView style={styles.container}>
         <View style={[styles.webHeader, { paddingTop: insets.top + Spacing.lg }]}>
-          <ThemedText type="h2">All Listings</ThemedText>
+          <ThemedText type="h2">Nearby Listings</ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
             Map view available in Expo Go
           </ThemedText>
         </View>
         <FlatList
-          data={listings}
+          data={sortedListings}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ListingListItem listing={item} onPress={() => navigation.navigate("GlobalListingDetail", { listingId: item.id })} />
@@ -156,12 +203,12 @@ export default function MapScreen() {
     return (
       <ThemedView style={[styles.container, styles.centered]}>
         <Feather name="map-pin" size={48} color={theme.textSecondary} />
-        <ThemedText type="h4" style={{ marginTop: Spacing.lg, textAlign: "center" }}>
+        <ThemedText type="h4" style={styles.permissionTitle}>
           Location Access Required
         </ThemedText>
         <ThemedText
           type="body"
-          style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm, paddingHorizontal: Spacing["2xl"] }}
+          style={[styles.permissionText, { color: theme.textSecondary }]}
         >
           Enable location access to see listings near you on the map
         </ThemedText>
@@ -182,7 +229,7 @@ export default function MapScreen() {
     );
   }
 
-  const markers = listings.map((listing) => ({
+  const markers = sortedListings.map((listing) => ({
     id: listing.id,
     latitude: listing.latitude,
     longitude: listing.longitude,
@@ -215,7 +262,7 @@ export default function MapScreen() {
         <View style={[styles.searchBar, { backgroundColor: theme.cardBackground }]}>
           <Feather name="search" size={20} color={theme.textSecondary} />
           <ThemedText type="body" style={{ color: theme.textSecondary }}>
-            Search all listings...
+            Search nearby listings...
           </ThemedText>
         </View>
       </View>
@@ -249,15 +296,14 @@ export default function MapScreen() {
               </ThemedText>
               <View style={styles.cardMeta}>
                 <Feather name="map-pin" size={12} color={theme.textSecondary} />
-                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                <ThemedText type="caption" style={{ color: theme.textSecondary }} numberOfLines={1}>
                   {selectedListing.city}, {selectedListing.state}
                 </ThemedText>
-                <View style={styles.rating}>
-                  <Feather name="star" size={12} color={Colors.light.accent} />
-                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                    {selectedListing.rating.toFixed(1)}
+                {selectedListing.distance !== undefined ? (
+                  <ThemedText type="caption" style={{ color: Colors.light.primary, fontWeight: "600", marginLeft: Spacing.sm }}>
+                    {formatDistance(selectedListing.distance)}
                   </ThemedText>
-                </View>
+                ) : null}
               </View>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -278,16 +324,17 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
   },
   map: {
     flex: 1,
   },
   webHeader: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.lg,
   },
   webListContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     gap: Spacing.md,
   },
   listItem: {
@@ -314,10 +361,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.xs,
   },
+  distanceBadge: {
+    marginLeft: Spacing.sm,
+  },
   header: {
     position: "absolute",
-    left: Spacing.lg,
-    right: Spacing.lg,
+    left: Spacing.xl,
+    right: Spacing.xl,
   },
   searchBar: {
     flexDirection: "row",
@@ -331,6 +381,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
+  },
+  permissionTitle: {
+    marginTop: Spacing.lg,
+    textAlign: "center",
+  },
+  permissionText: {
+    textAlign: "center",
+    marginTop: Spacing.sm,
   },
   markerContainer: {
     alignItems: "center",
@@ -358,8 +416,8 @@ const styles = StyleSheet.create({
   },
   listingCard: {
     position: "absolute",
-    left: Spacing.lg,
-    right: Spacing.lg,
+    left: Spacing.xl,
+    right: Spacing.xl,
     borderRadius: BorderRadius.sm,
     padding: Spacing.md,
     shadowColor: "#000",
@@ -388,12 +446,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.xs,
     marginTop: Spacing.xs,
-  },
-  rating: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    marginLeft: Spacing.sm,
   },
   closeButton: {
     position: "absolute",

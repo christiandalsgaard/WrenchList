@@ -2,6 +2,8 @@ import React from "react";
 import { View, FlatList, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
@@ -13,6 +15,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { useAuth } from "@/lib/authContext";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -89,14 +95,14 @@ function MessageItem({ message, onPress }: MessageItemProps) {
       </View>
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
-          <ThemedText type="body" style={{ fontWeight: message.unread ? "700" : "600" }}>
+          <ThemedText type="body" style={{ fontWeight: message.unread ? "700" : "600" }} numberOfLines={1}>
             {message.userName}
           </ThemedText>
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>
             {message.timestamp}
           </ThemedText>
         </View>
-        <ThemedText type="small" style={{ color: Colors.light.primary }}>
+        <ThemedText type="small" style={{ color: Colors.light.primary }} numberOfLines={1}>
           {message.listingTitle}
         </ThemedText>
         <ThemedText
@@ -118,15 +124,64 @@ export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation<RootNavProp>();
 
   const renderItem = ({ item }: { item: Message }) => (
     <MessageItem message={item} onPress={() => {}} />
   );
 
+  const handleSignIn = () => {
+    navigation.navigate("SignIn");
+  };
+
+  const handleCreateAccount = () => {
+    navigation.navigate("CreateAccount");
+  };
+
+  if (!user) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
+          <ThemedText type="h2">Messages</ThemedText>
+        </View>
+        <View style={[styles.signInPrompt, { paddingBottom: tabBarHeight + Spacing.xl }]}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.backgroundSecondary }]}>
+            <Feather name="message-circle" size={48} color={theme.textSecondary} />
+          </View>
+          <ThemedText type="h4" style={styles.promptTitle}>
+            Sign in to view messages
+          </ThemedText>
+          <ThemedText type="body" style={[styles.promptText, { color: theme.textSecondary }]}>
+            Connect with hosts and manage your rental conversations
+          </ThemedText>
+          <View style={styles.authButtons}>
+            <Pressable style={styles.primaryButton} onPress={handleSignIn}>
+              <ThemedText type="body" style={styles.primaryButtonText}>
+                Sign In
+              </ThemedText>
+            </Pressable>
+            <Pressable 
+              style={[styles.secondaryButton, { borderColor: Colors.light.primary }]} 
+              onPress={handleCreateAccount}
+            >
+              <ThemedText type="body" style={{ color: Colors.light.primary, fontWeight: "600" }}>
+                Create Account
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <ThemedText type="h2">Messages</ThemedText>
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+          {user.displayName}
+        </ThemedText>
       </View>
 
       <FlatList
@@ -162,11 +217,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.lg,
   },
   listContent: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   messageItem: {
     flexDirection: "row",
@@ -190,6 +245,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.xs,
+    gap: Spacing.sm,
   },
   unreadBadge: {
     width: 10,
@@ -206,6 +262,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing["5xl"],
+    paddingHorizontal: Spacing.xl,
     gap: Spacing.sm,
+  },
+  signInPrompt: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xl,
+  },
+  promptTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+  },
+  promptText: {
+    textAlign: "center",
+    marginBottom: Spacing.xl,
+  },
+  authButtons: {
+    width: "100%",
+    gap: Spacing.md,
+  },
+  primaryButton: {
+    height: Spacing.buttonHeight,
+    backgroundColor: Colors.light.primary,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    height: Spacing.buttonHeight,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
   },
 });
