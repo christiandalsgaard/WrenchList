@@ -235,7 +235,7 @@ export default function ExploreScreen() {
             <View style={[styles.hostCard, { backgroundColor: theme.cardBackground }]}>
               <Feather name="plus-circle" size={48} color={Colors.light.primary} />
               <ThemedText type="h4" style={styles.hostCardTitle}>
-                List Your Equipment
+                List Your Workshop or Equipment
               </ThemedText>
               <ThemedText type="body" style={[styles.hostCardDescription, { color: theme.textSecondary }]}>
                 Start earning by renting out your tools and equipment to people in your area.
