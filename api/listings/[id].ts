@@ -1,6 +1,6 @@
 /**
  * GET /api/listings/:id
- * Returns a single listing by its UUID.
+ * Returns a single listing by its UUID, including images and rating summary.
  */
 import { storage } from "../../server/storage";
 

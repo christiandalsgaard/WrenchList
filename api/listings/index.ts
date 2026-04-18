@@ -1,5 +1,5 @@
 /**
- * GET /api/listings — returns all listings, optionally filtered by category query param.
+ * GET /api/listings — paginated listing query with optional category/city filters.
  * POST /api/listings — creates a new listing (requires hostId in body).
  *   Auto-promotes user role to "host" if currently "customer".
  */
@@ -11,14 +11,15 @@ import { fromZodError } from "zod-validation-error";
 export async function GET(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url);
-    const category = url.searchParams.get("category");
+    const categoryId = url.searchParams.get("categoryId") ?? undefined;
+    const city = url.searchParams.get("city") ?? undefined;
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const cursorId = url.searchParams.get("cursorId") ?? undefined;
+    const limitStr = url.searchParams.get("limit");
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
 
-    // Filter by category if provided, otherwise return all
-    const listings = category
-      ? await storage.getListingsByCategory(category)
-      : await storage.getListings();
-
-    return Response.json({ listings });
+    const result = await storage.getListings({ categoryId, city, cursor, cursorId, limit });
+    return Response.json(result);
   } catch (error) {
     console.error("Get listings error:", error);
     return Response.json({ error: "Failed to fetch listings" }, { status: 500 });
