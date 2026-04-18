@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertListingSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertListingSchema } from "../shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 

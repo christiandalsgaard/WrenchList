@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import pg from "pg";
-import { users, listings, type User, type InsertUser, type Listing, type InsertListing } from "@shared/schema";
+import { users, listings, type User, type InsertUser, type Listing, type InsertListing } from "../shared/schema";
 import { hash, compare } from "bcrypt";
 
 const pool = new pg.Pool({

@@ -1,10 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 /**
- * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
- * @returns {string} The API base URL
+ * Gets the base URL for the Express API server.
+ * On web, uses the current page origin (API is same-origin on Vercel).
+ * On native, uses the EXPO_PUBLIC_DOMAIN env var.
  */
 export function getApiUrl(): string {
+  // On web, use same-origin — works for Vercel and local dev
+  if (typeof window !== "undefined" && window.location) {
+    return window.location.origin;
+  }
+
+  // On native, fall back to EXPO_PUBLIC_DOMAIN env var
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
