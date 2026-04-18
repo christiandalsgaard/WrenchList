@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
 
+/**
+ * User type matching the server's users table (minus passwordHash).
+ * New fields (bio, avatarUrl, etc.) are optional since older stored
+ * sessions from AsyncStorage won't have them.
+ */
 interface User {
   id: string;
   email: string;
@@ -11,8 +16,14 @@ interface User {
   city: string | null;
   state: string | null;
   zipCode: string | null;
-  role: "customer" | "host";
+  bio: string | null;
+  avatarUrl: string | null;
+  locationLat: string | null;
+  locationLng: string | null;
+  role: "customer" | "host" | "admin";
+  emailVerified: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface AuthContextType {

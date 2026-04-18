@@ -90,19 +90,25 @@ export default function CreateListingScreen() {
     setIsLoading(true);
 
     try {
+      // Map the selected priceUnit to the correct price tier field.
+      // The new schema stores separate hourly/daily/weekly prices in cents.
+      const priceCents = Math.round(priceValue * 100);
+      const priceFields: Record<string, number> = {};
+      if (priceUnit === "hour") priceFields.priceHourlyCents = priceCents;
+      if (priceUnit === "day") priceFields.priceDailyCents = priceCents;
+      if (priceUnit === "week") priceFields.priceWeeklyCents = priceCents;
+
       const response = await fetch(new URL("/api/listings", getApiUrl()).toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           hostId: user.id,
-          category,
+          categoryId: category,       // Changed from "category" to "categoryId"
           title: title.trim(),
           description: description.trim(),
           relativeLocation: relativeLocation.trim() || null,
           city: city.trim(),
-          priceCents: Math.round(priceValue * 100),
-          priceUnit,
-          photos,
+          ...priceFields,             // Spread the correct price tier
         }),
       });
 
