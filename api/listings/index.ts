@@ -46,6 +46,16 @@ export async function POST(request: Request): Promise<Response> {
       await storage.updateUserRole(hostId, "host");
     }
 
+    // If categoryId looks like a slug (not a UUID), resolve it to the actual UUID.
+    // This lets the frontend send "workshop" / "equipment" / "tools" directly.
+    if (listingData.categoryId && !listingData.categoryId.includes("-")) {
+      const cats = await storage.getCategories();
+      const match = cats.find((c: { slug: string }) => c.slug === listingData.categoryId);
+      if (match) {
+        listingData.categoryId = match.id;
+      }
+    }
+
     const data = insertListingSchema.parse(listingData);
     const listing = await storage.createListing(hostId, data);
     return Response.json({ listing }, { status: 201 });
