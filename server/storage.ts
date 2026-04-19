@@ -1,10 +1,10 @@
 /**
  * WrenchList Storage Layer
  *
- * Database access via Drizzle ORM over Neon's serverless HTTP driver.
- * Uses @neondatabase/serverless for stateless HTTP queries — no persistent
- * TCP connections, so it works perfectly in Vercel Functions without
- * exhausting connection limits.
+ * Database access via Drizzle ORM over Postgres (node-postgres).
+ * Uses Neon's pooled connection URL — their built-in PgBouncer handles
+ * serverless connection lifecycle, so each Vercel Function invocation
+ * gets a connection from the pool without exhausting limits.
  *
  * Key design decisions:
  * - IStorage interface defines the contract so we can swap implementations
@@ -16,9 +16,9 @@
  *   isn't set yet (e.g. first Vercel deploy before Marketplace provisioning).
  */
 
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and, desc, lt, gt, isNull, or, sql, asc } from "drizzle-orm";
+import pg from "pg";
 import {
   users,
   categories,
@@ -52,10 +52,14 @@ import { hash, compare } from "bcrypt";
 // ---------------------------------------------------------------------------
 
 /**
- * Lazy DB initialization using Neon's HTTP driver. Each query is a stateless
- * HTTP request — no connection pool, no TCP sockets, no connection limits.
- * Perfect for serverless (Vercel Functions) and scales to millions of
- * concurrent users without connection exhaustion.
+ * Lazy DB initialization using node-postgres with Neon's pooled connection URL.
+ * Neon's built-in PgBouncer handles serverless connection lifecycle — each
+ * Vercel Function gets a connection from the pool without exhausting limits.
+ *
+ * Pool settings:
+ * - max: 1 — serverless functions run one request at a time (Fluid Compute
+ *   may reuse instances, but a single connection per instance is enough)
+ * - idleTimeoutMillis: 20s — release connections quickly in serverless
  *
  * Lazy init prevents crashes at build time when DATABASE_URL isn't set yet.
  */
@@ -63,14 +67,17 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getDb() {
   if (!_db) {
-    const queryFn = neon(process.env.DATABASE_URL!);
-    _db = drizzle(queryFn);
+    const pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 1,                  // One connection per serverless instance
+      idleTimeoutMillis: 20000, // Release idle connections after 20s
+    });
+    _db = drizzle(pool);
   }
   return _db;
 }
 
 // Exported getter — call getDb() wherever you need the drizzle instance.
-// No Proxy wrapper: Proxy breaks libraries that inspect the DB object.
 export { getDb };
 
 const SALT_ROUNDS = 10;
