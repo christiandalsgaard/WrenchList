@@ -23,6 +23,10 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof ZodError) {
       return Response.json({ error: fromZodError(error).message }, { status: 400 });
     }
+    // Handle overlapping booking conflict
+    if (error instanceof Error && error.message === "BOOKING_OVERLAP") {
+      return Response.json({ error: "This listing is already booked for the selected dates" }, { status: 409 });
+    }
     console.error("Create booking error:", error);
     return Response.json({ error: "Failed to create booking" }, { status: 500 });
   }

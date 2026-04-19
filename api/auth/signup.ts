@@ -21,7 +21,8 @@ export async function POST(request: Request): Promise<Response> {
 
     // Create user and strip passwordHash from response
     const user = await storage.createUser(data);
-    const { passwordHash, ...safeUser } = user;
+    // Strip sensitive/internal fields from the response
+    const { passwordHash, deletedAt, ...safeUser } = user;
     return Response.json({ user: safeUser }, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {

@@ -19,7 +19,8 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    const { passwordHash, ...safeUser } = user;
+    // Strip sensitive/internal fields from the response
+    const { passwordHash, deletedAt, ...safeUser } = user;
     return Response.json({ user: safeUser });
   } catch (error) {
     if (error instanceof ZodError) {

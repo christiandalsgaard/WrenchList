@@ -1,9 +1,10 @@
 /**
  * WrenchList Storage Layer
  *
- * Database access via Drizzle ORM over Postgres. Provides CRUD operations
- * for all tables: users, categories, listings, bookings, reviews, messages,
- * conversations, and events.
+ * Database access via Drizzle ORM over Neon's serverless HTTP driver.
+ * Uses @neondatabase/serverless for stateless HTTP queries — no persistent
+ * TCP connections, so it works perfectly in Vercel Functions without
+ * exhausting connection limits.
  *
  * Key design decisions:
  * - IStorage interface defines the contract so we can swap implementations
@@ -11,13 +12,13 @@
  * - Cursor-based pagination on all list queries — scales to millions of rows
  *   without the performance cliff of OFFSET pagination.
  * - Soft deletes on users/listings — queries filter out deleted records by default.
- * - Connection pooling via pg.Pool — for serverless (Vercel Functions), consider
- *   replacing with @neondatabase/serverless or a PgBouncer-backed URL.
+ * - Lazy DB initialization — avoids crashing at build time when DATABASE_URL
+ *   isn't set yet (e.g. first Vercel deploy before Marketplace provisioning).
  */
 
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import { eq, and, desc, lt, gt, isNull, or, sql, asc } from "drizzle-orm";
-import pg from "pg";
 import {
   users,
   categories,
@@ -47,29 +48,37 @@ import {
 import { hash, compare } from "bcrypt";
 
 // ---------------------------------------------------------------------------
-// Database Connection
+// Database Connection (Lazy, Serverless-Safe)
 // ---------------------------------------------------------------------------
 
 /**
- * Connection pool for Postgres. In serverless environments (Vercel Functions),
- * each function invocation may reuse or create a new pool. Keep max connections
- * low to avoid exhausting the database connection limit.
+ * Lazy DB initialization using Neon's HTTP driver. Each query is a stateless
+ * HTTP request — no connection pool, no TCP sockets, no connection limits.
+ * Perfect for serverless (Vercel Functions) and scales to millions of
+ * concurrent users without connection exhaustion.
  *
- * For production at scale, replace with:
- * - Neon serverless driver (@neondatabase/serverless) for HTTP-based queries
- * - PgBouncer connection pooling URL for persistent pool reuse
+ * Lazy init prevents crashes at build time when DATABASE_URL isn't set yet.
  */
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10, // Max connections per pool — keep low for serverless
-});
+let _db: ReturnType<typeof drizzle> | null = null;
 
-export const db = drizzle(pool);
+function getDb() {
+  if (!_db) {
+    const queryFn = neon(process.env.DATABASE_URL!);
+    _db = drizzle(queryFn);
+  }
+  return _db;
+}
+
+// Exported getter — call getDb() wherever you need the drizzle instance.
+// No Proxy wrapper: Proxy breaks libraries that inspect the DB object.
+export { getDb };
 
 const SALT_ROUNDS = 10;
 
 // Default page size for paginated queries
 const DEFAULT_PAGE_SIZE = 20;
+// Maximum page size — prevents abuse via ?limit=999999
+const MAX_PAGE_SIZE = 100;
 
 // ---------------------------------------------------------------------------
 // Pagination Types
@@ -151,6 +160,14 @@ export interface IStorage {
   // Events
   trackEvent(userId: string | null, data: InsertEvent): Promise<void>;
 
+  // Semantic Search
+  searchListingsByEmbedding(
+    embedding: number[],
+    limit?: number,
+    categoryId?: string,
+    city?: string
+  ): Promise<{ listing: Listing; similarity: number }[]>;
+
   // AI Conversations
   createConversation(userId: string, context?: Record<string, unknown>): Promise<{ id: string }>;
   addConversationMessage(conversationId: string, role: string, content: string, metadata?: Record<string, unknown>, tokenCount?: number): Promise<void>;
@@ -165,7 +182,7 @@ export class DatabaseStorage implements IStorage {
   // ---- Users ---------------------------------------------------------------
 
   async getUser(id: string): Promise<User | undefined> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(users)
       .where(and(eq(users.id, id), isNull(users.deletedAt)));
@@ -173,7 +190,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(users)
       .where(and(eq(users.email, email), isNull(users.deletedAt)));
@@ -183,7 +200,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     // Hash password before storing — bcrypt with 10 salt rounds
     const passwordHash = await hash(insertUser.password, SALT_ROUNDS);
-    const result = await db
+    const result = await getDb()
       .insert(users)
       .values({
         email: insertUser.email,
@@ -215,7 +232,7 @@ export class DatabaseStorage implements IStorage {
     if (data.locationLat !== undefined) updateData.locationLat = String(data.locationLat);
     if (data.locationLng !== undefined) updateData.locationLng = String(data.locationLng);
 
-    const result = await db
+    const result = await getDb()
       .update(users)
       .set(updateData)
       .where(and(eq(users.id, id), isNull(users.deletedAt)))
@@ -231,14 +248,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserRole(userId: string, role: "customer" | "host" | "admin"): Promise<void> {
-    await db
+    await getDb()
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, userId));
   }
 
   async softDeleteUser(id: string): Promise<void> {
-    await db
+    await getDb()
       .update(users)
       .set({ deletedAt: new Date() })
       .where(eq(users.id, id));
@@ -247,14 +264,14 @@ export class DatabaseStorage implements IStorage {
   // ---- Categories ----------------------------------------------------------
 
   async getCategories(): Promise<Category[]> {
-    return db
+    return getDb()
       .select()
       .from(categories)
       .orderBy(asc(categories.sortOrder), asc(categories.name));
   }
 
   async getCategoryBySlug(slug: string): Promise<Category | undefined> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(categories)
       .where(eq(categories.slug, slug));
@@ -269,7 +286,7 @@ export class DatabaseStorage implements IStorage {
     iconName?: string;
     sortOrder?: number;
   }): Promise<Category> {
-    const result = await db
+    const result = await getDb()
       .insert(categories)
       .values({
         slug: data.slug,
@@ -286,7 +303,7 @@ export class DatabaseStorage implements IStorage {
   // ---- Listings ------------------------------------------------------------
 
   async createListing(hostId: string, listing: InsertListing): Promise<Listing> {
-    const result = await db
+    const result = await getDb()
       .insert(listings)
       .values({
         hostId,
@@ -310,7 +327,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getListing(id: string): Promise<Listing | undefined> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(listings)
       .where(and(eq(listings.id, id), isNull(listings.deletedAt)));
@@ -324,7 +341,7 @@ export class DatabaseStorage implements IStorage {
   async getListings(
     params?: PaginationParams & { categoryId?: string; city?: string }
   ): Promise<PaginatedResult<Listing>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
     // Build filter conditions — always exclude deleted and non-active listings
     const conditions = [
@@ -352,7 +369,7 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(listings)
       .where(and(...conditions))
@@ -374,7 +391,7 @@ export class DatabaseStorage implements IStorage {
     hostId: string,
     params?: PaginationParams
   ): Promise<PaginatedResult<Listing>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const conditions = [
       eq(listings.hostId, hostId),
       isNull(listings.deletedAt),
@@ -392,7 +409,7 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(listings)
       .where(and(...conditions))
@@ -427,7 +444,7 @@ export class DatabaseStorage implements IStorage {
     if (data.safetyRequirements !== undefined) updateData.safetyRequirements = data.safetyRequirements;
     if (data.status !== undefined) updateData.status = data.status;
 
-    const result = await db
+    const result = await getDb()
       .update(listings)
       .set(updateData)
       .where(and(eq(listings.id, id), isNull(listings.deletedAt)))
@@ -436,7 +453,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async softDeleteListing(id: string): Promise<void> {
-    await db
+    await getDb()
       .update(listings)
       .set({ deletedAt: new Date(), status: "archived" })
       .where(eq(listings.id, id));
@@ -450,7 +467,7 @@ export class DatabaseStorage implements IStorage {
     altText?: string,
     sortOrder?: number
   ): Promise<void> {
-    await db.insert(listingImages).values({
+    await getDb().insert(listingImages).values({
       listingId,
       url,
       altText: altText || null,
@@ -459,7 +476,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getListingImages(listingId: string) {
-    return db
+    return getDb()
       .select({
         id: listingImages.id,
         url: listingImages.url,
@@ -484,7 +501,7 @@ export class DatabaseStorage implements IStorage {
     model: string,
     sourceText: string
   ): Promise<void> {
-    await db
+    await getDb()
       .insert(listingEmbeddings)
       .values({
         listingId,
@@ -507,7 +524,33 @@ export class DatabaseStorage implements IStorage {
   // ---- Bookings ------------------------------------------------------------
 
   async createBooking(customerId: string, data: InsertBooking): Promise<Booking> {
-    const result = await db
+    // Check for overlapping bookings on the same listing — prevents double-booking
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+    const overlapping = await getDb()
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.listingId, data.listingId),
+          // Only count active bookings (not cancelled/disputed)
+          or(
+            eq(bookings.status, "pending"),
+            eq(bookings.status, "confirmed"),
+            eq(bookings.status, "active")
+          )!,
+          // Overlap check: existing.start < new.end AND existing.end > new.start
+          lt(bookings.startDate, endDate),
+          gt(bookings.endDate, startDate)
+        )
+      )
+      .limit(1);
+
+    if (overlapping.length > 0) {
+      throw new Error("BOOKING_OVERLAP");
+    }
+
+    const result = await getDb()
       .insert(bookings)
       .values({
         listingId: data.listingId,
@@ -526,7 +569,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBooking(id: string): Promise<Booking | undefined> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(bookings)
       .where(eq(bookings.id, id));
@@ -537,14 +580,14 @@ export class DatabaseStorage implements IStorage {
     customerId: string,
     params?: PaginationParams
   ): Promise<PaginatedResult<Booking>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const conditions = [eq(bookings.customerId, customerId)];
 
     if (params?.cursor) {
       conditions.push(lt(bookings.createdAt, new Date(params.cursor)));
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(bookings)
       .where(and(...conditions))
@@ -566,14 +609,14 @@ export class DatabaseStorage implements IStorage {
     hostId: string,
     params?: PaginationParams
   ): Promise<PaginatedResult<Booking>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const conditions = [eq(bookings.hostId, hostId)];
 
     if (params?.cursor) {
       conditions.push(lt(bookings.createdAt, new Date(params.cursor)));
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(bookings)
       .where(and(...conditions))
@@ -601,7 +644,7 @@ export class DatabaseStorage implements IStorage {
       updateData.cancelledAt = new Date();
     }
 
-    const result = await db
+    const result = await getDb()
       .update(bookings)
       .set(updateData)
       .where(eq(bookings.id, id))
@@ -612,7 +655,7 @@ export class DatabaseStorage implements IStorage {
   // ---- Reviews -------------------------------------------------------------
 
   async createReview(reviewerId: string, data: InsertReview): Promise<Review> {
-    const result = await db
+    const result = await getDb()
       .insert(reviews)
       .values({
         bookingId: data.bookingId,
@@ -633,14 +676,14 @@ export class DatabaseStorage implements IStorage {
     listingId: string,
     params?: PaginationParams
   ): Promise<PaginatedResult<Review>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const conditions = [eq(reviews.listingId, listingId)];
 
     if (params?.cursor) {
       conditions.push(lt(reviews.createdAt, new Date(params.cursor)));
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(reviews)
       .where(and(...conditions))
@@ -659,7 +702,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAverageRating(listingId: string): Promise<{ avg: number; count: number }> {
-    const result = await db
+    const result = await getDb()
       .select({
         avg: sql<number>`COALESCE(AVG(${reviews.rating}), 0)`,
         count: sql<number>`COUNT(*)`,
@@ -672,7 +715,7 @@ export class DatabaseStorage implements IStorage {
   // ---- Messages ------------------------------------------------------------
 
   async sendMessage(senderId: string, data: InsertMessage): Promise<Message> {
-    const result = await db
+    const result = await getDb()
       .insert(messages)
       .values({
         senderId,
@@ -694,7 +737,7 @@ export class DatabaseStorage implements IStorage {
     otherUserId: string,
     params?: PaginationParams
   ): Promise<PaginatedResult<Message>> {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
     const conditions = [
       or(
@@ -707,7 +750,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(lt(messages.createdAt, new Date(params.cursor)));
     }
 
-    const result = await db
+    const result = await getDb()
       .select()
       .from(messages)
       .where(and(...conditions))
@@ -731,7 +774,7 @@ export class DatabaseStorage implements IStorage {
    */
   async getConversationPreviews(userId: string) {
     // Use raw SQL for the complex aggregation query
-    const result = await db.execute(sql`
+    const result = await getDb().execute(sql`
       WITH ranked_messages AS (
         SELECT
           CASE WHEN sender_id = ${userId} THEN receiver_id ELSE sender_id END AS other_user_id,
@@ -771,7 +814,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markMessagesRead(userId: string, senderId: string): Promise<void> {
-    await db
+    await getDb()
       .update(messages)
       .set({ readAt: new Date() })
       .where(
@@ -792,7 +835,7 @@ export class DatabaseStorage implements IStorage {
    */
   async trackEvent(userId: string | null, data: InsertEvent): Promise<void> {
     try {
-      await db.insert(events).values({
+      await getDb().insert(events).values({
         userId,
         sessionId: data.sessionId || null,
         eventType: data.eventType,
@@ -805,13 +848,70 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // ---- Semantic Search ------------------------------------------------------
+
+  /**
+   * Finds listings similar to the given embedding vector using cosine distance.
+   * Uses the HNSW index on listing_embeddings for fast approximate nearest neighbor.
+   * Only returns active, non-deleted listings. Optional category/city filters.
+   */
+  async searchListingsByEmbedding(
+    embedding: number[],
+    limit: number = 10,
+    categoryId?: string,
+    city?: string
+  ): Promise<{ listing: Listing; similarity: number }[]> {
+    // Build the vector string for pgvector's cosine distance operator (<=>)
+    const vectorStr = `[${embedding.join(",")}]`;
+
+    // Raw SQL query for vector similarity with joins and filters
+    const result = await getDb().execute(sql`
+      SELECT
+        l.*,
+        1 - (e.embedding <=> ${vectorStr}::vector) AS similarity
+      FROM listing_embeddings e
+      JOIN listings l ON l.id = e.listing_id
+      WHERE l.deleted_at IS NULL
+        AND l.status = 'active'
+        ${categoryId ? sql`AND l.category_id = ${categoryId}` : sql``}
+        ${city ? sql`AND l.city = ${city}` : sql``}
+      ORDER BY e.embedding <=> ${vectorStr}::vector
+      LIMIT ${limit}
+    `);
+
+    return (result.rows as any[]).map((row) => ({
+      listing: {
+        id: row.id,
+        hostId: row.host_id,
+        categoryId: row.category_id,
+        title: row.title,
+        description: row.description,
+        status: row.status,
+        city: row.city,
+        state: row.state,
+        relativeLocation: row.relative_location,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        priceHourlyCents: row.price_hourly_cents,
+        priceDailyCents: row.price_daily_cents,
+        priceWeeklyCents: row.price_weekly_cents,
+        specs: row.specs,
+        safetyRequirements: row.safety_requirements,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+      } as Listing,
+      similarity: Number(row.similarity),
+    }));
+  }
+
   // ---- AI Conversations ----------------------------------------------------
 
   async createConversation(
     userId: string,
     context?: Record<string, unknown>
   ): Promise<{ id: string }> {
-    const result = await db
+    const result = await getDb()
       .insert(conversations)
       .values({
         userId,
@@ -828,7 +928,7 @@ export class DatabaseStorage implements IStorage {
     metadata?: Record<string, unknown>,
     tokenCount?: number
   ): Promise<void> {
-    await db.insert(conversationMessages).values({
+    await getDb().insert(conversationMessages).values({
       conversationId,
       role: role as "user" | "assistant" | "system",
       content,
@@ -837,14 +937,14 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Update the conversation's updatedAt timestamp
-    await db
+    await getDb()
       .update(conversations)
       .set({ updatedAt: new Date() })
       .where(eq(conversations.id, conversationId));
   }
 
   async getConversationMessages(conversationId: string) {
-    const result = await db
+    const result = await getDb()
       .select({
         role: conversationMessages.role,
         content: conversationMessages.content,

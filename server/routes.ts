@@ -37,6 +37,7 @@ import {
 } from "../shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { rateLimit } from "./rate-limit";
 
 /**
  * Helper to extract pagination params from query string.
@@ -51,9 +52,18 @@ function getPaginationParams(query: Record<string, unknown>) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ---- Rate Limiting -------------------------------------------------------
+  // Auth endpoints get stricter limits (5 per minute) to prevent brute force.
+  // General API endpoints get standard limits (30 per minute per IP).
+  const authLimiter = rateLimit(5, 60000);
+  const generalLimiter = rateLimit(30, 60000);
+
+  // Apply general rate limiting to all API routes
+  app.use("/api/", generalLimiter);
+
   // ---- Auth ----------------------------------------------------------------
 
-  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+  app.post("/api/auth/signup", authLimiter, async (req: Request, res: Response) => {
     try {
       const data = insertUserSchema.parse(req.body);
 
@@ -63,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.createUser(data);
-      const { passwordHash, ...safeUser } = user;
+      const { passwordHash, deletedAt, ...safeUser } = user;
       return res.status(201).json({ user: safeUser });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -74,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/signin", async (req: Request, res: Response) => {
+  app.post("/api/auth/signin", authLimiter, async (req: Request, res: Response) => {
     try {
       const data = loginSchema.parse(req.body);
       const user = await storage.verifyPassword(data.email, data.password);
@@ -83,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
-      const { passwordHash, ...safeUser } = user;
+      const { passwordHash, deletedAt, ...safeUser } = user;
       return res.json({ user: safeUser });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -206,6 +216,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof ZodError) {
         return res.status(400).json({ error: fromZodError(error).message });
       }
+      // Handle overlapping booking conflict
+      if (error instanceof Error && error.message === "BOOKING_OVERLAP") {
+        return res.status(409).json({ error: "This listing is already booked for the selected dates" });
+      }
       console.error("Create booking error:", error);
       return res.status(500).json({ error: "Failed to create booking" });
     }
@@ -238,6 +252,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.body;
       if (!status) {
         return res.status(400).json({ error: "Status is required" });
+      }
+
+      // Validate status against the booking_status enum
+      const validStatuses = ["pending", "confirmed", "active", "completed", "cancelled", "disputed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
 
       const booking = await storage.updateBookingStatus(req.params.id, status);
@@ -330,6 +350,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---- Semantic Search ------------------------------------------------------
+
+  app.post("/api/search", async (req: Request, res: Response) => {
+    try {
+      const { embedding, limit, categoryId, city } = req.body;
+
+      if (!embedding || !Array.isArray(embedding)) {
+        return res.status(400).json({ error: "embedding array is required" });
+      }
+
+      // Validate embedding dimensions (1536 for text-embedding-3-small)
+      if (embedding.length !== 1536) {
+        return res.status(400).json({ error: `Expected 1536-dimension embedding, got ${embedding.length}` });
+      }
+
+      const results = await storage.searchListingsByEmbedding(
+        embedding,
+        Math.min(limit || 10, 50), // Cap at 50 results
+        categoryId,
+        city
+      );
+
+      return res.json({ results });
+    } catch (error) {
+      console.error("Search error:", error);
+      return res.status(500).json({ error: "Search failed" });
+    }
+  });
+
   // ---- Events --------------------------------------------------------------
 
   app.post("/api/events", async (req: Request, res: Response) => {
@@ -342,6 +391,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       // Event tracking should never return errors to the client
       return res.status(202).json({ ok: true });
+    }
+  });
+
+  // ---- AI Conversations ----------------------------------------------------
+
+  app.post("/api/conversations", async (req: Request, res: Response) => {
+    try {
+      const { userId, context } = req.body;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required." });
+      }
+
+      const conversation = await storage.createConversation(userId, context);
+      return res.status(201).json({ conversation });
+    } catch (error) {
+      console.error("Create conversation error:", error);
+      return res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
+    try {
+      const { role, content, metadata, tokenCount } = req.body;
+      if (!role || !content) {
+        return res.status(400).json({ error: "role and content are required" });
+      }
+
+      await storage.addConversationMessage(req.params.id, role, content, metadata, tokenCount);
+      return res.status(201).json({ ok: true });
+    } catch (error) {
+      console.error("Add conversation message error:", error);
+      return res.status(500).json({ error: "Failed to add message" });
+    }
+  });
+
+  app.get("/api/conversations/:id/messages", async (req: Request, res: Response) => {
+    try {
+      const messages = await storage.getConversationMessages(req.params.id);
+      return res.json({ messages });
+    } catch (error) {
+      console.error("Get conversation messages error:", error);
+      return res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
 
