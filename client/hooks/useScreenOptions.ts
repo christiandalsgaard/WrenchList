@@ -15,7 +15,8 @@ export function useScreenOptions({
 
   return {
     headerTitleAlign: "center",
-    headerTransparent: transparent,
+    // Transparent headers with blur work on iOS but cause content underlap on web/Android
+    headerTransparent: transparent && Platform.OS === "ios",
     headerBlurEffect: isDark ? "dark" : "light",
     headerTintColor: theme.text,
     headerStyle: {
