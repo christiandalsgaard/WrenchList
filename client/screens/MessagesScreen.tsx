@@ -1,5 +1,5 @@
 import React from "react";
-import { View, FlatList, StyleSheet, Pressable } from "react-native";
+import { View, FlatList, StyleSheet, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -127,8 +127,17 @@ export default function MessagesScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<RootNavProp>();
 
+  // Tapping a message shows the conversation preview — full thread screen is planned
+  const handleMessagePress = (message: Message) => {
+    Alert.alert(
+      message.userName,
+      `Re: ${message.listingTitle}\n\n"${message.lastMessage}"`,
+      [{ text: "OK" }]
+    );
+  };
+
   const renderItem = ({ item }: { item: Message }) => (
-    <MessageItem message={item} onPress={() => {}} />
+    <MessageItem message={item} onPress={() => handleMessagePress(item)} />
   );
 
   const handleSignIn = () => {
