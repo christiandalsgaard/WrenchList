@@ -44,7 +44,7 @@ const mockListings: Listing[] = [
     reviewCount: 47,
     features: ["CNC Machine", "MIG/TIG Welding", "Industrial Lathe", "Air Compressor", "Ventilation System"],
     safetyRequirements: "Safety glasses and closed-toe shoes required. Welding certification needed for welding equipment.",
-    imageUrl: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=400&fit=crop",
     createdAt: new Date("2024-01-15"),
   },
   {
@@ -66,7 +66,7 @@ const mockListings: Listing[] = [
     reviewCount: 32,
     features: ["Table Saw", "Band Saw", "Planer", "Jointer", "Dust Collection"],
     safetyRequirements: "Eye protection required. Must complete safety orientation before first use.",
-    imageUrl: "https://images.unsplash.com/photo-1565620731-169b73fa2e5c?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1597766659227-65cff803cce0?w=400&h=400&fit=crop",
     createdAt: new Date("2024-02-20"),
   },
   {
@@ -88,7 +88,7 @@ const mockListings: Listing[] = [
     reviewCount: 89,
     features: ["4-Ton Capacity", "Rubber Tracks", "Multiple Buckets", "Thumb Attachment", "Delivery Available"],
     safetyRequirements: "Valid operator certification required. Site must be accessible for delivery truck.",
-    imageUrl: "https://images.unsplash.com/photo-1580901368919-7738efb0f228?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1635187316753-4d26a4623150?w=400&h=400&fit=crop",
     createdAt: new Date("2024-01-10"),
   },
   {
@@ -110,7 +110,7 @@ const mockListings: Listing[] = [
     reviewCount: 56,
     features: ["2,690 lb Capacity", "Multiple Attachments", "Enclosed Cab", "A/C", "Backup Camera"],
     safetyRequirements: "Operator training certificate required. Minimum 1-day rental.",
-    imageUrl: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1616625330673-b74e2e05a66e?w=400&h=400&fit=crop",
     createdAt: new Date("2024-03-05"),
   },
   {
@@ -132,7 +132,7 @@ const mockListings: Listing[] = [
     reviewCount: 78,
     features: ["4000 PSI", "Hot Water Capable", "50ft Hose", "Surface Cleaner Attachment", "Turbo Nozzle"],
     safetyRequirements: "Eye protection required. Do not use on painted surfaces without testing first.",
-    imageUrl: "https://images.unsplash.com/photo-1622964889366-ff0a8d042e42?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=400&h=400&fit=crop",
     createdAt: new Date("2024-02-15"),
   },
   {
@@ -154,7 +154,7 @@ const mockListings: Listing[] = [
     reviewCount: 41,
     features: ["54\" Cutting Deck", "Zero Turn", "Mulching Kit", "Bagger Available", "Fuel Included"],
     safetyRequirements: "Flat, obstacle-free terrain required. Not for slopes greater than 15 degrees.",
-    imageUrl: "https://images.unsplash.com/photo-1590212151175-e58edd96185b?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=400&h=400&fit=crop",
     createdAt: new Date("2024-03-01"),
   },
   {
@@ -176,7 +176,7 @@ const mockListings: Listing[] = [
     reviewCount: 124,
     features: ["Hammer Drill", "Impact Driver", "Circular Saw", "Reciprocating Saw", "2 Batteries + Charger"],
     safetyRequirements: "Safety glasses required. Return tools clean and in original case.",
-    imageUrl: "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=400&fit=crop",
     createdAt: new Date("2024-01-25"),
   },
   {
@@ -198,7 +198,7 @@ const mockListings: Listing[] = [
     reviewCount: 67,
     features: ["12\" Blade", "Dual Bevel", "Sliding Arm", "Laser Guide", "Dust Bag"],
     safetyRequirements: "Eye and ear protection required. Do not cut metal without proper blade.",
-    imageUrl: "https://images.unsplash.com/photo-1616401784845-180882c95582?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?w=400&h=400&fit=crop",
     createdAt: new Date("2024-02-10"),
   },
   {
@@ -220,7 +220,7 @@ const mockListings: Listing[] = [
     reviewCount: 93,
     features: ["450 Pieces", "SAE & Metric", "Rolling Tool Chest", "Specialty Tools", "Torque Wrench"],
     safetyRequirements: "All tools must be returned clean. Missing items will be charged at replacement cost.",
-    imageUrl: "https://images.unsplash.com/photo-1530124566582-a45a7e3d0c44?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=400&h=400&fit=crop",
     createdAt: new Date("2024-01-20"),
   },
   {
@@ -242,7 +242,7 @@ const mockListings: Listing[] = [
     reviewCount: 52,
     features: ["Pipe Wrenches (3 sizes)", "Basin Wrench", "Tubing Cutter", "PEX Crimping Tool", "Thread Kit"],
     safetyRequirements: "Return tools clean and dry. Specialty items must be inspected upon return.",
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&h=400&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=400&h=400&fit=crop",
     createdAt: new Date("2024-03-10"),
   },
 ];

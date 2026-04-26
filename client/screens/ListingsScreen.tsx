@@ -363,7 +363,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   imagePlaceholder: {
-    height: 120,
+    aspectRatio: 1,
+    width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
