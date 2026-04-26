@@ -32,6 +32,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (data: SignUpData) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  /** Merge partial user updates into local state + AsyncStorage (e.g. after profile edits) */
+  updateUser: (partial: Partial<User>) => Promise<void>;
 }
 
 interface SignUpData {
@@ -119,8 +121,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
   }, []);
 
+  // Merge partial user data into state + persist to AsyncStorage
+  const updateUser = useCallback(async (partial: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...partial };
+      AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

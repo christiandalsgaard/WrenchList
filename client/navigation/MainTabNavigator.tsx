@@ -11,7 +11,7 @@ import Animated, {
 import ExploreStackNavigator from "@/navigation/ExploreStackNavigator";
 import MapScreen from "@/screens/MapScreen";
 import MessagesScreen from "@/screens/MessagesScreen";
-import ProfileScreen from "@/screens/ProfileScreen";
+import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing } from "@/constants/theme";
 
@@ -88,7 +88,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (

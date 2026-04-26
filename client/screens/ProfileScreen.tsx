@@ -1,5 +1,5 @@
-import React from "react";
-import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, ScrollView, StyleSheet, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -16,9 +16,13 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/lib/authContext";
+import { getApiUrl } from "@/lib/query-client";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 
+// Two navigation types: root stack for modals (SignIn, CreateAccount) and profile stack for sub-screens
 type RootNavProp = NativeStackNavigationProp<RootStackParamList>;
+type ProfileNavProp = NativeStackNavigationProp<ProfileStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -26,11 +30,12 @@ interface MenuItemProps {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   onPress: () => void;
-  showBadge?: boolean;
+  badgeCount?: number;
   danger?: boolean;
+  disabled?: boolean;
 }
 
-function MenuItem({ icon, label, onPress, showBadge, danger }: MenuItemProps) {
+function MenuItem({ icon, label, onPress, badgeCount, danger, disabled }: MenuItemProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -48,10 +53,10 @@ function MenuItem({ icon, label, onPress, showBadge, danger }: MenuItemProps) {
 
   return (
     <AnimatedPressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={[styles.menuItem, animatedStyle]}
+      onPress={disabled ? undefined : onPress}
+      onPressIn={disabled ? undefined : handlePressIn}
+      onPressOut={disabled ? undefined : handlePressOut}
+      style={[styles.menuItem, animatedStyle, disabled && { opacity: 0.4 }]}
     >
       <View style={[styles.menuIcon, { backgroundColor: theme.backgroundSecondary }]}>
         <Feather
@@ -66,10 +71,11 @@ function MenuItem({ icon, label, onPress, showBadge, danger }: MenuItemProps) {
       >
         {label}
       </ThemedText>
-      {showBadge ? (
+      {/* Show badge only when count > 0 */}
+      {badgeCount && badgeCount > 0 ? (
         <View style={styles.badge}>
           <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-            2
+            {badgeCount}
           </ThemedText>
         </View>
       ) : null}
@@ -83,24 +89,65 @@ export default function ProfileScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const { user, signOut } = useAuth();
-  const navigation = useNavigation<RootNavProp>();
+
+  // Root navigation for modals (SignIn, CreateAccount)
+  const rootNav = useNavigation<RootNavProp>();
+  // Profile stack navigation for sub-screens
+  const profileNav = useNavigation<ProfileNavProp>();
+
+  // Fetch real saved listings count for badge
+  const [savedCount, setSavedCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setSavedCount(0);
+      return;
+    }
+    // Fetch saved listing count from API
+    const fetchCount = async () => {
+      try {
+        const res = await fetch(
+          new URL(`/api/users/${user.id}/saved-listings/count`, getApiUrl()).toString()
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSavedCount(data.count || 0);
+        }
+      } catch {
+        // Silently fail — badge just won't show
+      }
+    };
+    fetchCount();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
   };
 
   const handleSignIn = () => {
-    navigation.navigate("SignIn");
+    rootNav.navigate("SignIn");
   };
 
   const handleCreateAccount = () => {
-    navigation.navigate("CreateAccount");
+    rootNav.navigate("CreateAccount");
+  };
+
+  // Guard: require auth for ACCOUNT and SETTINGS items
+  const requireAuth = (screen: keyof ProfileStackParamList) => {
+    if (!user) {
+      Alert.alert("Sign In Required", "Please sign in to access this feature.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Sign In", onPress: handleSignIn },
+      ]);
+      return;
+    }
+    profileNav.navigate(screen);
   };
 
   const displayName = user?.displayName || "Guest User";
   const userRole = user?.role || "customer";
-  const userLocation = user?.city && user?.state 
-    ? `${user.city}, ${user.state}` 
+  const userLocation = user?.city && user?.state
+    ? `${user.city}, ${user.state}`
     : user?.city || "Location not set";
   const userInitials = user?.displayName
     ? user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -119,6 +166,7 @@ export default function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* --- Profile header with avatar, name, role badge, email, location --- */}
         <View style={styles.profileSection}>
           <View style={[styles.avatar, { backgroundColor: user ? Colors.light.primary : theme.backgroundSecondary }]}>
             {userInitials ? (
@@ -156,6 +204,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* --- Auth buttons for unauthenticated users --- */}
         {!user ? (
           <View style={styles.authButtons}>
             <Pressable style={styles.primaryButton} onPress={handleSignIn}>
@@ -163,8 +212,8 @@ export default function ProfileScreen() {
                 Sign In
               </ThemedText>
             </Pressable>
-            <Pressable 
-              style={[styles.secondaryButton, { borderColor: Colors.light.primary }]} 
+            <Pressable
+              style={[styles.secondaryButton, { borderColor: Colors.light.primary }]}
               onPress={handleCreateAccount}
             >
               <ThemedText type="body" style={{ color: Colors.light.primary, fontWeight: "600" }}>
@@ -174,33 +223,62 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
+        {/* --- ACCOUNT section: Booking History, Saved Listings, Payment Methods --- */}
         <View style={[styles.section, { borderColor: theme.border }]}>
           <ThemedText type="caption" style={[styles.sectionTitle, { color: theme.textSecondary }]}>
             ACCOUNT
           </ThemedText>
-          <MenuItem icon="calendar" label="Booking History" onPress={() => {}} />
-          <MenuItem icon="heart" label="Saved Listings" onPress={() => {}} showBadge />
-          <MenuItem icon="credit-card" label="Payment Methods" onPress={() => {}} />
+          <MenuItem
+            icon="calendar"
+            label="Booking History"
+            onPress={() => requireAuth("BookingHistory")}
+            disabled={!user}
+          />
+          <MenuItem
+            icon="heart"
+            label="Saved Listings"
+            onPress={() => requireAuth("SavedListings")}
+            badgeCount={savedCount}
+            disabled={!user}
+          />
+          <MenuItem
+            icon="credit-card"
+            label="Payment Methods"
+            onPress={() => requireAuth("PaymentMethods")}
+            disabled={!user}
+          />
         </View>
 
+        {/* --- SETTINGS section: Notifications, Location Preferences --- */}
         <View style={[styles.section, { borderColor: theme.border }]}>
           <ThemedText type="caption" style={[styles.sectionTitle, { color: theme.textSecondary }]}>
             SETTINGS
           </ThemedText>
-          <MenuItem icon="bell" label="Notifications" onPress={() => {}} />
-          <MenuItem icon="map-pin" label="Location Preferences" onPress={() => {}} />
-          <MenuItem icon="sliders" label="Units & Preferences" onPress={() => {}} />
+          <MenuItem
+            icon="bell"
+            label="Notifications"
+            onPress={() => requireAuth("Notifications")}
+            disabled={!user}
+          />
+          <MenuItem
+            icon="map-pin"
+            label="Location Preferences"
+            onPress={() => requireAuth("LocationPreferences")}
+            disabled={!user}
+          />
         </View>
 
+        {/* --- SUPPORT section: Help, Terms, Privacy (accessible without auth) --- */}
         <View style={[styles.section, { borderColor: theme.border }]}>
           <ThemedText type="caption" style={[styles.sectionTitle, { color: theme.textSecondary }]}>
             SUPPORT
           </ThemedText>
-          <MenuItem icon="help-circle" label="Help & Support" onPress={() => {}} />
-          <MenuItem icon="file-text" label="Terms of Service" onPress={() => {}} />
-          <MenuItem icon="shield" label="Privacy Policy" onPress={() => {}} />
+          <MenuItem icon="help-circle" label="Help & Support" onPress={() => profileNav.navigate("HelpSupport")} />
+          <MenuItem icon="file-text" label="Terms of Service" onPress={() => profileNav.navigate("TermsOfService")} />
+          <MenuItem icon="shield" label="Privacy Policy" onPress={() => profileNav.navigate("PrivacyPolicy")} />
         </View>
 
+        {/* --- Sign Out button (only when authenticated) --- */}
         {user ? (
           <View style={styles.section}>
             <MenuItem icon="log-out" label="Sign Out" onPress={handleSignOut} danger />

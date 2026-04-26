@@ -31,6 +31,8 @@ import {
   conversations,
   conversationMessages,
   events,
+  savedListings,
+  notificationPreferences,
   type User,
   type InsertUser,
   type UpdateUser,
@@ -174,6 +176,21 @@ export interface IStorage {
     categoryId?: string,
     city?: string
   ): Promise<{ listing: Listing; similarity: number }[]>;
+
+  // Saved Listings
+  saveListing(userId: string, listingId: string): Promise<void>;
+  unsaveListing(userId: string, listingId: string): Promise<void>;
+  getSavedListings(userId: string, params?: PaginationParams): Promise<PaginatedResult<Listing>>;
+  getSavedListingCount(userId: string): Promise<number>;
+  isListingSaved(userId: string, listingId: string): Promise<boolean>;
+
+  // Notification Preferences
+  getNotificationPreferences(userId: string): Promise<{ bookingUpdates: boolean; messages: boolean; promotions: boolean } | undefined>;
+  upsertNotificationPreferences(userId: string, prefs: { bookingUpdates?: boolean; messages?: boolean; promotions?: boolean }): Promise<{ bookingUpdates: boolean; messages: boolean; promotions: boolean }>;
+
+  // Enriched Bookings (with listing details for display)
+  getEnrichedBookingsByCustomer(userId: string, params?: PaginationParams): Promise<PaginatedResult<Booking & { listingTitle: string; listingCity: string }>>;
+  getEnrichedBookingsByHost(userId: string, params?: PaginationParams): Promise<PaginatedResult<Booking & { listingTitle: string; listingCity: string }>>;
 
   // AI Conversations
   createConversation(userId: string, context?: Record<string, unknown>): Promise<{ id: string }>;
@@ -853,6 +870,230 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Event tracking error (non-fatal):", error);
     }
+  }
+
+  // ---- Saved Listings -------------------------------------------------------
+
+  /**
+   * Save a listing to the user's favorites. Idempotent — if already saved,
+   * the ON CONFLICT clause silently does nothing.
+   */
+  async saveListing(userId: string, listingId: string): Promise<void> {
+    await getDb()
+      .insert(savedListings)
+      .values({ userId, listingId })
+      .onConflictDoNothing();
+  }
+
+  async unsaveListing(userId: string, listingId: string): Promise<void> {
+    await getDb()
+      .delete(savedListings)
+      .where(
+        and(
+          eq(savedListings.userId, userId),
+          eq(savedListings.listingId, listingId)
+        )
+      );
+  }
+
+  /**
+   * Get the user's saved listings with full listing objects.
+   * JOINs saved_listings with listings, returning only active non-deleted listings.
+   */
+  async getSavedListings(
+    userId: string,
+    params?: PaginationParams
+  ): Promise<PaginatedResult<Listing>> {
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+
+    const conditions = [
+      eq(savedListings.userId, userId),
+      isNull(listings.deletedAt),
+    ];
+
+    if (params?.cursor) {
+      conditions.push(
+        lt(savedListings.createdAt, new Date(params.cursor))
+      );
+    }
+
+    const result = await getDb()
+      .select({
+        // Select all listing fields
+        listing: listings,
+        savedAt: savedListings.createdAt,
+        savedId: savedListings.id,
+      })
+      .from(savedListings)
+      .innerJoin(listings, eq(savedListings.listingId, listings.id))
+      .where(and(...conditions))
+      .orderBy(desc(savedListings.createdAt))
+      .limit(limit + 1);
+
+    const hasNext = result.length > limit;
+    const items = hasNext ? result.slice(0, limit) : result;
+    const lastItem = items[items.length - 1];
+
+    return {
+      items: items.map((r) => r.listing),
+      nextCursor: hasNext && lastItem ? lastItem.savedAt.toISOString() : null,
+      nextCursorId: hasNext && lastItem ? lastItem.savedId : null,
+    };
+  }
+
+  async getSavedListingCount(userId: string): Promise<number> {
+    const result = await getDb()
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(savedListings)
+      .innerJoin(listings, eq(savedListings.listingId, listings.id))
+      .where(
+        and(
+          eq(savedListings.userId, userId),
+          isNull(listings.deletedAt)
+        )
+      );
+    return Number(result[0].count);
+  }
+
+  async isListingSaved(userId: string, listingId: string): Promise<boolean> {
+    const result = await getDb()
+      .select({ id: savedListings.id })
+      .from(savedListings)
+      .where(
+        and(
+          eq(savedListings.userId, userId),
+          eq(savedListings.listingId, listingId)
+        )
+      )
+      .limit(1);
+    return result.length > 0;
+  }
+
+  // ---- Notification Preferences --------------------------------------------
+
+  async getNotificationPreferences(
+    userId: string
+  ): Promise<{ bookingUpdates: boolean; messages: boolean; promotions: boolean } | undefined> {
+    const result = await getDb()
+      .select({
+        bookingUpdates: notificationPreferences.bookingUpdates,
+        messages: notificationPreferences.messages,
+        promotions: notificationPreferences.promotions,
+      })
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return result[0];
+  }
+
+  async upsertNotificationPreferences(
+    userId: string,
+    prefs: { bookingUpdates?: boolean; messages?: boolean; promotions?: boolean }
+  ): Promise<{ bookingUpdates: boolean; messages: boolean; promotions: boolean }> {
+    const result = await getDb()
+      .insert(notificationPreferences)
+      .values({
+        userId,
+        bookingUpdates: prefs.bookingUpdates ?? true,
+        messages: prefs.messages ?? true,
+        promotions: prefs.promotions ?? false,
+      })
+      .onConflictDoUpdate({
+        target: notificationPreferences.userId,
+        set: {
+          ...(prefs.bookingUpdates !== undefined && { bookingUpdates: prefs.bookingUpdates }),
+          ...(prefs.messages !== undefined && { messages: prefs.messages }),
+          ...(prefs.promotions !== undefined && { promotions: prefs.promotions }),
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
+        bookingUpdates: notificationPreferences.bookingUpdates,
+        messages: notificationPreferences.messages,
+        promotions: notificationPreferences.promotions,
+      });
+    return result[0];
+  }
+
+  // ---- Enriched Bookings ---------------------------------------------------
+
+  /**
+   * Get bookings for a customer with listing title and city joined in.
+   * Used by the BookingHistoryScreen to display listing context.
+   */
+  async getEnrichedBookingsByCustomer(
+    userId: string,
+    params?: PaginationParams
+  ): Promise<PaginatedResult<Booking & { listingTitle: string; listingCity: string }>> {
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const conditions = [eq(bookings.customerId, userId)];
+
+    if (params?.cursor) {
+      conditions.push(lt(bookings.createdAt, new Date(params.cursor)));
+    }
+
+    const result = await getDb()
+      .select({
+        booking: bookings,
+        listingTitle: listings.title,
+        listingCity: listings.city,
+      })
+      .from(bookings)
+      .innerJoin(listings, eq(bookings.listingId, listings.id))
+      .where(and(...conditions))
+      .orderBy(desc(bookings.createdAt))
+      .limit(limit + 1);
+
+    const hasNext = result.length > limit;
+    const items = hasNext ? result.slice(0, limit) : result;
+    const lastItem = items[items.length - 1];
+
+    return {
+      items: items.map((r) => ({
+        ...r.booking,
+        listingTitle: r.listingTitle,
+        listingCity: r.listingCity,
+      })),
+      nextCursor: hasNext && lastItem ? lastItem.booking.createdAt.toISOString() : null,
+      nextCursorId: hasNext && lastItem ? lastItem.booking.id : null,
+    };
+  }
+
+  async getEnrichedBookingsByHost(
+    userId: string,
+    params?: PaginationParams
+  ): Promise<PaginatedResult<Booking & { listingTitle: string; listingCity: string }>> {
+    const limit = Math.min(params?.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    const conditions = [eq(bookings.hostId, userId)];
+
+    if (params?.cursor) {
+      conditions.push(lt(bookings.createdAt, new Date(params.cursor)));
+    }
+
+    const result = await getDb()
+      .select({
+        booking: bookings,
+        listingTitle: listings.title,
+        listingCity: listings.city,
+      })
+      .from(bookings)
+      .innerJoin(listings, eq(bookings.listingId, listings.id))
+      .where(and(...conditions))
+      .orderBy(desc(bookings.createdAt))
+      .limit(limit + 1);
+
+    const hasNext = result.length > limit;
+    const items = hasNext ? result.slice(0, limit) : result;
+    const lastItem = items[items.length - 1];
+
+    return {
+      items: items.map((r) => ({
+        ...r.booking,
+        listingTitle: r.listingTitle,
+        listingCity: r.listingCity,
+      })),
+      nextCursor: hasNext && lastItem ? lastItem.booking.createdAt.toISOString() : null,
+      nextCursorId: hasNext && lastItem ? lastItem.booking.id : null,
+    };
   }
 
   // ---- Semantic Search ------------------------------------------------------

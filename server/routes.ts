@@ -34,6 +34,8 @@ import {
   insertReviewSchema,
   insertMessageSchema,
   insertEventSchema,
+  updateUserSchema,
+  updateNotificationPreferencesSchema,
 } from "../shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -197,6 +199,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get user listings error:", error);
       return res.status(500).json({ error: "Failed to fetch listings" });
+    }
+  });
+
+  // ---- User Profile --------------------------------------------------------
+
+  app.get("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const { passwordHash, deletedAt, ...safeUser } = user;
+      return res.json({ user: safeUser });
+    } catch (error) {
+      console.error("Get user error:", error);
+      return res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.patch("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const data = updateUserSchema.parse(req.body);
+      const user = await storage.updateUser(req.params.id, data);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const { passwordHash, deletedAt, ...safeUser } = user;
+      return res.json({ user: safeUser });
+    } catch (error) {
+      if (error instanceof ZodError) return res.status(400).json({ error: fromZodError(error).message });
+      console.error("Update user error:", error);
+      return res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // ---- Enriched Bookings ---------------------------------------------------
+
+  app.get("/api/users/:id/bookings", async (req: Request, res: Response) => {
+    try {
+      const pagination = getPaginationParams(req.query as Record<string, string>);
+      const result = await storage.getEnrichedBookingsByCustomer(req.params.id, pagination);
+      return res.json(result);
+    } catch (error) {
+      console.error("Get enriched bookings error:", error);
+      return res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  app.get("/api/users/:id/host-bookings", async (req: Request, res: Response) => {
+    try {
+      const pagination = getPaginationParams(req.query as Record<string, string>);
+      const result = await storage.getEnrichedBookingsByHost(req.params.id, pagination);
+      return res.json(result);
+    } catch (error) {
+      console.error("Get host bookings error:", error);
+      return res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // ---- Saved Listings ------------------------------------------------------
+
+  app.get("/api/users/:id/saved-listings/count", async (req: Request, res: Response) => {
+    try {
+      const count = await storage.getSavedListingCount(req.params.id);
+      return res.json({ count });
+    } catch (error) {
+      console.error("Get saved count error:", error);
+      return res.status(500).json({ error: "Failed to get count" });
+    }
+  });
+
+  app.get("/api/users/:id/saved-listings", async (req: Request, res: Response) => {
+    try {
+      const pagination = getPaginationParams(req.query as Record<string, string>);
+      const result = await storage.getSavedListings(req.params.id, pagination);
+      return res.json(result);
+    } catch (error) {
+      console.error("Get saved listings error:", error);
+      return res.status(500).json({ error: "Failed to fetch saved listings" });
+    }
+  });
+
+  app.post("/api/users/:id/saved-listings", async (req: Request, res: Response) => {
+    try {
+      const { listingId } = req.body;
+      if (!listingId) return res.status(400).json({ error: "listingId is required" });
+      const listing = await storage.getListing(listingId);
+      if (!listing) return res.status(404).json({ error: "Listing not found" });
+      await storage.saveListing(req.params.id, listingId);
+      return res.status(201).json({ ok: true });
+    } catch (error) {
+      console.error("Save listing error:", error);
+      return res.status(500).json({ error: "Failed to save listing" });
+    }
+  });
+
+  app.delete("/api/users/:id/saved-listings/:listingId", async (req: Request, res: Response) => {
+    try {
+      await storage.unsaveListing(req.params.id, req.params.listingId);
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Unsave listing error:", error);
+      return res.status(500).json({ error: "Failed to unsave listing" });
+    }
+  });
+
+  // ---- Notification Preferences --------------------------------------------
+
+  app.get("/api/users/:id/notification-preferences", async (req: Request, res: Response) => {
+    try {
+      const prefs = await storage.getNotificationPreferences(req.params.id);
+      return res.json({ preferences: prefs || { bookingUpdates: true, messages: true, promotions: false } });
+    } catch (error) {
+      console.error("Get notification prefs error:", error);
+      return res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  app.put("/api/users/:id/notification-preferences", async (req: Request, res: Response) => {
+    try {
+      const data = updateNotificationPreferencesSchema.parse(req.body);
+      const prefs = await storage.upsertNotificationPreferences(req.params.id, data);
+      return res.json({ preferences: prefs });
+    } catch (error) {
+      if (error instanceof ZodError) return res.status(400).json({ error: fromZodError(error).message });
+      console.error("Update notification prefs error:", error);
+      return res.status(500).json({ error: "Failed to update preferences" });
     }
   });
 

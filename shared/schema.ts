@@ -464,6 +464,55 @@ export const events = pgTable(
   ]
 );
 
+// ---- Saved Listings (Favorites/Wishlist) ----------------------------------
+// Junction table linking users to their favorited listings. The unique
+// constraint on (userId, listingId) prevents duplicate saves.
+
+export const savedListings = pgTable(
+  "saved_listings",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id),
+    listingId: varchar("listing_id")
+      .notNull()
+      .references(() => listings.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("saved_listings_user_listing_idx").on(table.userId, table.listingId),
+    index("saved_listings_user_idx").on(table.userId, table.createdAt),
+  ]
+);
+
+// ---- Notification Preferences ---------------------------------------------
+// One row per user storing their notification opt-in/out choices.
+// Defaults are set at the DB level so a missing row means "use defaults".
+
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id),
+    bookingUpdates: boolean("booking_updates").default(true).notNull(),
+    messages: boolean("messages").default(true).notNull(),
+    promotions: boolean("promotions").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("notification_preferences_user_idx").on(table.userId),
+  ]
+);
+
 // ---------------------------------------------------------------------------
 // Zod Validation Schemas
 // Written manually to avoid drizzle-zod version incompatibilities and give
@@ -571,6 +620,20 @@ export const insertEventSchema = z.object({
   payload: z.record(z.unknown()).optional(),
 });
 
+// ---- Saved Listing schemas ------------------------------------------------
+
+export const insertSavedListingSchema = z.object({
+  listingId: z.string().min(1, "Listing ID is required"),
+});
+
+// ---- Notification Preferences schemas -------------------------------------
+
+export const updateNotificationPreferencesSchema = z.object({
+  bookingUpdates: z.boolean().optional(),
+  messages: z.boolean().optional(),
+  promotions: z.boolean().optional(),
+});
+
 // ---------------------------------------------------------------------------
 // TypeScript Types
 // ---------------------------------------------------------------------------
@@ -599,3 +662,8 @@ export type Category = typeof categories.$inferSelect;
 export type ListingImage = typeof listingImages.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type ConversationMessage = typeof conversationMessages.$inferSelect;
+
+export type SavedListing = typeof savedListings.$inferSelect;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertSavedListing = z.infer<typeof insertSavedListingSchema>;
+export type UpdateNotificationPreferences = z.infer<typeof updateNotificationPreferencesSchema>;
