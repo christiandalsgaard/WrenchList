@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, ScrollView, StyleSheet, Pressable, Platform, Alert } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, Platform, Alert, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -268,9 +268,13 @@ export default function ListingDetailScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Image placeholder with save/heart button overlay */}
+        {/* Listing image with save/heart button overlay */}
         <View style={[styles.imageContainer, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="image" size={64} color={theme.textSecondary} />
+          {listing.imageUrl ? (
+            <Image source={{ uri: listing.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <Feather name="image" size={64} color={theme.textSecondary} />
+          )}
           {/* Heart/save button in top-right corner */}
           <Pressable
             style={[styles.saveButton, { backgroundColor: "rgba(0,0,0,0.4)" }]}

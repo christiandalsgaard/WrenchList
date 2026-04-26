@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   Dimensions,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -69,9 +70,13 @@ function ListingCard({ listing, onPress }: ListingCardProps) {
         animatedStyle,
       ]}
     >
-      <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundSecondary }]}>
-        <Feather name="image" size={32} color={theme.textSecondary} />
-      </View>
+      {listing.imageUrl ? (
+        <Image source={{ uri: listing.imageUrl }} style={styles.imagePlaceholder} resizeMode="cover" />
+      ) : (
+        <View style={[styles.imagePlaceholder, { backgroundColor: theme.backgroundSecondary }]}>
+          <Feather name="image" size={32} color={theme.textSecondary} />
+        </View>
+      )}
       <View style={styles.listingInfo}>
         <ThemedText type="body" style={styles.listingTitle} numberOfLines={1}>
           {listing.title}
@@ -284,9 +289,13 @@ export default function ListingsScreen() {
                 onPress={() => handleListingPress(selectedListing.id)}
                 style={styles.mapCardContent}
               >
-                <View style={[styles.mapCardImage, { backgroundColor: theme.backgroundSecondary }]}>
-                  <Feather name="image" size={24} color={theme.textSecondary} />
-                </View>
+                {selectedListing.imageUrl ? (
+                  <Image source={{ uri: selectedListing.imageUrl }} style={styles.mapCardImage} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.mapCardImage, { backgroundColor: theme.backgroundSecondary }]}>
+                    <Feather name="image" size={24} color={theme.textSecondary} />
+                  </View>
+                )}
                 <View style={styles.mapCardInfo}>
                   <ThemedText type="body" numberOfLines={1}>
                     {selectedListing.title}
@@ -354,7 +363,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   imagePlaceholder: {
-    height: 100,
+    height: 120,
     alignItems: "center",
     justifyContent: "center",
   },
