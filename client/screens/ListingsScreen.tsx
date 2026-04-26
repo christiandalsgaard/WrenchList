@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Pressable,
   Platform,
-  Dimensions,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
@@ -36,14 +36,14 @@ type NavigationProp = NativeStackNavigationProp<ExploreStackParamList, "Listings
 type RootNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface ListingCardProps {
   listing: Listing;
   onPress: () => void;
+  cardWidth: number;
 }
 
-function ListingCard({ listing, onPress }: ListingCardProps) {
+function ListingCard({ listing, onPress, cardWidth }: ListingCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -66,7 +66,7 @@ function ListingCard({ listing, onPress }: ListingCardProps) {
       onPressOut={handlePressOut}
       style={[
         styles.listingCard,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border },
+        { backgroundColor: theme.cardBackground, borderColor: theme.border, maxWidth: cardWidth },
         animatedStyle,
       ]}
     >
@@ -137,6 +137,11 @@ export default function ListingsScreen() {
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
+  // Responsive grid: 2 columns on mobile, 3 on medium, 4 on wide screens
+  const { width: screenWidth } = useWindowDimensions();
+  const numColumns = screenWidth >= 1024 ? 4 : screenWidth >= 768 ? 3 : 2;
+  const cardWidth = (screenWidth - Spacing.lg * (numColumns + 1)) / numColumns;
+
   const listings = useMemo(() => {
     return getMockListings(categoryId, filters, userLocation);
   }, [categoryId, filters, userLocation]);
@@ -188,7 +193,7 @@ export default function ListingsScreen() {
   if (filters.proximityMiles) activeFilters.push({ key: "proximityMiles", label: `Within ${filters.proximityMiles} mi` });
 
   const renderListItem = ({ item }: { item: Listing }) => (
-    <ListingCard listing={item} onPress={() => handleListingPress(item.id)} />
+    <ListingCard listing={item} onPress={() => handleListingPress(item.id)} cardWidth={cardWidth} />
   );
 
   const initialRegion = userLocation
@@ -242,10 +247,11 @@ export default function ListingsScreen() {
 
       {viewMode === "list" || Platform.OS === "web" ? (
         <FlatList
+          key={`grid-${numColumns}`}
           data={listings}
           keyExtractor={(item) => item.id}
           renderItem={renderListItem}
-          numColumns={2}
+          numColumns={numColumns}
           columnWrapperStyle={styles.row}
           contentContainerStyle={[
             styles.listContent,
@@ -357,7 +363,6 @@ const styles = StyleSheet.create({
   },
   listingCard: {
     flex: 1,
-    maxWidth: (SCREEN_WIDTH - Spacing.lg * 3) / 2,
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
     overflow: "hidden",
